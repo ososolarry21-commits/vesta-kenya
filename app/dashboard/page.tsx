@@ -1,24 +1,23 @@
-'use client';
-import { useEffect, useState } from 'react';
-import { createClient } from '@supabase/supabase-js';
-import { useRouter } from 'next/navigation';
+'use client'
+import { useEffect, useState } from 'react'
+import { createClient } from '@supabase/supabase-js'
+import { useRouter } from 'next/navigation'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL || '',
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
-);
+)
 
 export default function Dashboard() {
-  const [user, setUser] = useState<any>(null);
-  const [profile, setProfile] = useState<any>(null);
-  const [listings, setListings] = useState<any[]>([]);
-  const [stats, setStats] = useState({ total: 0, active: 0, pending: 0 });
-  const [loading, setLoading] = useState(true);
-  const [showAddForm, setShowAddForm] = useState(false);
-  const [uploadingImages, setUploadingImages] = useState(false);
-  const router = useRouter();
+  const [user, setUser] = useState<any>(null)
+  const [profile, setProfile] = useState<any>(null)
+  const [listings, setListings] = useState<any[]>([])
+  const [stats, setStats] = useState({ total: 0, active: 0, pending: 0 })
+  const [loading, setLoading] = useState(true)
+  const [showAddForm, setShowAddForm] = useState(false)
+  const [uploadingImages, setUploadingImages] = useState(false)
+  const router = useRouter()
 
-  // Form state
   const [formData, setFormData] = useState({
     name: '',
     type: 'Bedsitter',
@@ -30,36 +29,34 @@ export default function Dashboard() {
     distance: '',
     gender: 'Mixed',
     description: '',
-    amenities: [] as string[],
-  });
-
-  const [images, setImages] = useState<File[]>([]);
-  const [imagePreviews, setImagePreviews] = useState<string[]>([]);
+    amenities: [] as string[]
+  })
+  
+  const [images, setImages] = useState<File[]>([])
+  const [imagePreviews, setImagePreviews] = useState<string[]>([])
 
   useEffect(() => {
-    checkUser();
-  }, []);
+    checkUser()
+  }, [])
 
   async function checkUser() {
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    const { data: { user } } = await supabase.auth.getUser()
     if (!user) {
-      router.push('/');
-      return;
+      router.push('/')
+      return
     }
 
-    setUser(user);
+    setUser(user)
 
     const { data: profileData } = await supabase
       .from('profiles')
       .select('*')
       .eq('id', user.id)
-      .single();
+      .single()
 
-    setProfile(profileData);
-    await fetchListings(user.id);
-    setLoading(false);
+    setProfile(profileData)
+    await fetchListings(user.id)
+    setLoading(false)
   }
 
   async function fetchListings(userId: string) {
@@ -67,63 +64,56 @@ export default function Dashboard() {
       .from('listings')
       .select('*')
       .eq('landlord_id', userId)
-      .order('created_at', { ascending: false });
+      .order('created_at', { ascending: false })
 
     if (data) {
-      setListings(data);
+      setListings(data)
       setStats({
         total: data.length,
-        active: data.filter((l) => l.status === 'approved').length,
-        pending: data.filter((l) => l.status === 'pending').length,
-      });
+        active: data.filter((l: any) => l.status === 'approved').length,
+        pending: data.filter((l: any) => l.status === 'pending').length
+      })
     }
   }
 
-  // Handle image selection
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
-      const selectedFiles = Array.from(e.target.files);
-      setImages(selectedFiles);
-
-      // Create previews
-      const previews = selectedFiles.map((file) => URL.createObjectURL(file));
-      setImagePreviews(previews);
+      const selectedFiles = Array.from(e.target.files)
+      setImages(selectedFiles)
+      const previews = selectedFiles.map(file => URL.createObjectURL(file))
+      setImagePreviews(previews)
     }
-  };
+  }
 
-  // Upload images to Supabase Storage
   const uploadImages = async (listingId: string): Promise<string[]> => {
-    const imageUrls: string[] = [];
-
+    const imageUrls: string[] = []
     for (let i = 0; i < images.length; i++) {
-      const file = images[i];
-      const fileExt = file.name.split('.').pop();
-      const fileName = `${listingId}-${Date.now()}-${i}.${fileExt}`;
+      const file = images[i]
+      const fileExt = file.name.split('.').pop()
+      const fileName = `${listingId}-${Date.now()}-${i}.${fileExt}`
       const { error: uploadError } = await supabase.storage
         .from('property-images')
-        .upload(fileName, file);
+        .upload(fileName, file)
 
       if (uploadError) {
-        console.error('Image upload error:', uploadError);
-        throw uploadError;
+        console.error('Image upload error:', uploadError)
+        throw uploadError
       }
 
       const { data } = supabase.storage
         .from('property-images')
-        .getPublicUrl(fileName);
-
-      imageUrls.push(data.publicUrl);
+        .getPublicUrl(fileName)
+      
+      imageUrls.push(data.publicUrl)
     }
-
-    return imageUrls;
-  };
+    return imageUrls
+  }
 
   async function handleAddListing(e: React.FormEvent) {
-    e.preventDefault();
-    if (!user) return;
+    e.preventDefault()
+    if (!user) return
 
     try {
-      // First create the listing
       const { data: listingData, error: insertError } = await supabase
         .from('listings')
         .insert({
@@ -132,35 +122,32 @@ export default function Dashboard() {
           price: Number(formData.price),
           deposit: formData.deposit ? Number(formData.deposit) : null,
           status: 'pending',
-          images: [], // Temporary empty array
+          images: []
         })
         .select()
-        .single();
+        .single()
 
-      if (insertError) throw insertError;
+      if (insertError) throw insertError
 
-      // If there are images, upload them
-      let imageUrls: string[] = [];
+      let imageUrls: string[] = []
       if (images.length > 0) {
-        setUploadingImages(true);
+        setUploadingImages(true)
         try {
-          imageUrls = await uploadImages(listingData.id);
-
-          // Update listing with image URLs
+          imageUrls = await uploadImages(listingData.id)
           await supabase
             .from('listings')
             .update({ images: imageUrls })
-            .eq('id', listingData.id);
+            .eq('id', listingData.id)
         } catch (uploadErr) {
-          console.error('Upload failed:', uploadErr);
+          console.error('Upload failed:', uploadErr)
         }
-        setUploadingImages(false);
+        setUploadingImages(false)
       }
 
-      alert('Listing created successfully! Wait for admin approval.');
-      setShowAddForm(false);
-      setImages([]);
-      setImagePreviews([]);
+      alert('Listing created successfully! Wait for admin approval.')
+      setShowAddForm(false)
+      setImages([])
+      setImagePreviews([])
       setFormData({
         name: '',
         type: 'Bedsitter',
@@ -172,366 +159,172 @@ export default function Dashboard() {
         distance: '',
         gender: 'Mixed',
         description: '',
-        amenities: [],
-      });
-      await fetchListings(user.id);
+        amenities: []
+      })
+      await fetchListings(user.id)
     } catch (error: any) {
-      alert('Error creating listing: ' + error.message);
+      alert('Error creating listing: ' + error.message)
     }
   }
 
   async function deleteListing(id: string) {
-    if (!confirm('Delete this listing?')) return;
+    if (!confirm('Delete this listing?')) return
 
-    const { error } = await supabase.from('listings').delete().eq('id', id);
+    const { error } = await supabase
+      .from('listings')
+      .delete()
+      .eq('id', id)
 
     if (error) {
-      alert('Error deleting: ' + error.message);
+      alert('Error deleting: ' + error.message)
     } else {
-      await fetchListings(user!.id);
+      await fetchListings(user!.id)
     }
   }
 
   async function signOut() {
-    await supabase.auth.signOut();
-    router.push('/');
+    await supabase.auth.signOut()
+    router.push('/')
   }
 
   if (loading) {
     return (
-      <div
-        style={{
-          minHeight: '100vh',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          background: '#FDF8F3',
-        }}
-      >
+      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#FDF8F3' }}>
         <div style={{ textAlign: 'center' }}>
-          <div style={{ fontSize: 48, marginBottom: 16 }}>⏳</div>
-          <div style={{ color: '#6B5B4E' }}>Loading dashboard...</div>
+          <div style={{ fontSize: 48, marginBottom: 16 }}>Loading...</div>
         </div>
       </div>
-    );
+    )
   }
 
   return (
-    <div
-      style={{
-        minHeight: '100vh',
-        background: '#FDF8F3',
-        fontFamily:
-          "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
-      }}
-    >
-      {/* Navigation */}
-      <nav
-        style={{
-          background: 'white',
-          padding: '16px 60px',
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          boxShadow: '0 2px 20px rgba(0,0,0,0.05)',
-        }}
-      >
-        {/* AESTHETIC LOGO */}
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 12,
-            cursor: 'pointer',
-          }}
-          onClick={() => router.push('/')}
-        >
-          <img
-            src="/logo.png"
-            alt="Vesta"
-            style={{
-              height: '50px',
-              width: 'auto',
-              objectFit: 'contain',
-            }}
+    <div style={{ minHeight: '100vh', background: '#FDF8F3', fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" }}>
+      <nav style={{ 
+        background: 'white', 
+        padding: '16px 60px', 
+        display: 'flex', 
+        justifyContent: 'space-between', 
+        alignItems: 'center', 
+        boxShadow: '0 2px 20px rgba(0,0,0,0.05)' 
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer' }} onClick={() => router.push('/')}>
+          <img 
+            src="/logo.png" 
+            alt="Vesta" 
+            style={{ height: '50px', width: 'auto', objectFit: 'contain' }} 
           />
         </div>
-
+        
         <div style={{ display: 'flex', gap: 12 }}>
           {profile?.role === 'admin' && (
-            <button
+            <button 
               onClick={() => router.push('/admin')}
-              style={{
-                padding: '10px 20px',
-                background: '#1C1209',
-                color: 'white',
-                border: 'none',
-                borderRadius: 8,
-                cursor: 'pointer',
-                fontWeight: 600,
-              }}
+              style={{ padding: '10px 20px', background: '#1C1209', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontWeight: 600 }}
             >
-              🛡️ Admin Panel
+              Admin Panel
             </button>
           )}
-          <button
+          <button 
             onClick={() => router.push('/dashboard/settings')}
-            style={{
-              padding: '10px 20px',
-              background: 'transparent',
-              color: '#1C1209',
-              border: '2px solid #DDD0C4',
-              borderRadius: 8,
-              cursor: 'pointer',
-              fontWeight: 600,
-            }}
+            style={{ padding: '10px 20px', background: 'transparent', color: '#1C1209', border: '2px solid #DDD0C4', borderRadius: 8, cursor: 'pointer', fontWeight: 600 }}
           >
-            ⚙️ Settings
+            Settings
           </button>
-          <button
-            onClick={signOut}
-            style={{
-              padding: '10px 20px',
-              background: 'transparent',
-              color: '#DC3545',
-              border: '2px solid #DC3545',
-              borderRadius: 8,
-              cursor: 'pointer',
-              fontWeight: 600,
-            }}
+          <button 
+            onClick={signOut} 
+            style={{ padding: '10px 20px', background: 'transparent', color: '#DC3545', border: '2px solid #DC3545', borderRadius: 8, cursor: 'pointer', fontWeight: 600 }}
           >
             Sign Out
           </button>
         </div>
       </nav>
 
-      {/* Hero Section */}
-      <div
-        style={{
-          background: 'linear-gradient(135deg, #1C1209 0%, #3A2A1D 100%)',
-          padding: '60px 60px 40px',
-          color: 'white',
-        }}
-      >
+      <div style={{ 
+        background: 'linear-gradient(135deg, #1C1209 0%, #3A2A1D 100%)',
+        padding: '60px 60px 40px',
+        color: 'white'
+      }}>
         <h1 style={{ fontSize: 32, fontWeight: 700, margin: '0 0 8px 0' }}>
-          Welcome back, {profile?.name || 'Landlord'}! 👋
+          Welcome back, {profile?.name || 'Landlord'}!
         </h1>
-        <p style={{ margin: 0, opacity: 0.9 }}>
-          Manage your student accommodation listings
-        </p>
+        <p style={{ margin: 0, opacity: 0.9 }}>Manage your student accommodation listings</p>
       </div>
 
-      {/* Stats Cards */}
       <div style={{ padding: '40px 60px', maxWidth: 1400, margin: '0 auto' }}>
-        <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
-            gap: 20,
-            marginBottom: 40,
-          }}
-        >
-          <div
-            style={{
-              background: 'white',
-              padding: 30,
-              borderRadius: 16,
-              boxShadow: '0 4px 20px rgba(0,0,0,0.06)',
-            }}
-          >
-            <div
-              style={{
-                fontSize: 36,
-                fontWeight: 800,
-                color: '#D4873A',
-                marginBottom: 8,
-              }}
-            >
-              {stats.total}
-            </div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: 20, marginBottom: 40 }}>
+          <div style={{ background: 'white', padding: 30, borderRadius: 16, boxShadow: '0 4px 20px rgba(0,0,0,0.06)' }}>
+            <div style={{ fontSize: 36, fontWeight: 800, color: '#D4873A', marginBottom: 8 }}>{stats.total}</div>
             <div style={{ color: '#6B5B4E', fontSize: 14 }}>Total Listings</div>
           </div>
-          <div
-            style={{
-              background: 'white',
-              padding: 30,
-              borderRadius: 16,
-              boxShadow: '0 4px 20px rgba(0,0,0,0.06)',
-            }}
-          >
-            <div
-              style={{
-                fontSize: 36,
-                fontWeight: 800,
-                color: '#2A7A5A',
-                marginBottom: 8,
-              }}
-            >
-              {stats.active}
-            </div>
-            <div style={{ color: '#6B5B4E', fontSize: 14 }}>
-              Active Listings
-            </div>
+          <div style={{ background: 'white', padding: 30, borderRadius: 16, boxShadow: '0 4px 20px rgba(0,0,0,0.06)' }}>
+            <div style={{ fontSize: 36, fontWeight: 800, color: '#2A7A5A', marginBottom: 8 }}>{stats.active}</div>
+            <div style={{ color: '#6B5B4E', fontSize: 14 }}>Active Listings</div>
           </div>
-          <div
-            style={{
-              background: 'white',
-              padding: 30,
-              borderRadius: 16,
-              boxShadow: '0 4px 20px rgba(0,0,0,0.06)',
-            }}
-          >
-            <div
-              style={{
-                fontSize: 36,
-                fontWeight: 800,
-                color: '#007BFF',
-                marginBottom: 8,
-              }}
-            >
-              {stats.pending}
-            </div>
-            <div style={{ color: '#6B5B4E', fontSize: 14 }}>
-              Pending Approval
-            </div>
+          <div style={{ background: 'white', padding: 30, borderRadius: 16, boxShadow: '0 4px 20px rgba(0,0,0,0.06)' }}>
+            <div style={{ fontSize: 36, fontWeight: 800, color: '#007BFF', marginBottom: 8 }}>{stats.pending}</div>
+            <div style={{ color: '#6B5B4E', fontSize: 14 }}>Pending Approval</div>
           </div>
         </div>
 
-        {/* Add Listing Button */}
         <div style={{ marginBottom: 30 }}>
-          <button
+          <button 
             onClick={() => setShowAddForm(!showAddForm)}
-            style={{
-              padding: '14px 28px',
-              background: '#D4873A',
-              color: 'white',
-              border: 'none',
-              borderRadius: 10,
-              cursor: 'pointer',
+            style={{ 
+              padding: '14px 28px', 
+              background: '#D4873A', 
+              color: 'white', 
+              border: 'none', 
+              borderRadius: 10, 
+              cursor: 'pointer', 
               fontWeight: 700,
               fontSize: 15,
               display: 'flex',
               alignItems: 'center',
-              gap: 8,
+              gap: 8
             }}
           >
-            {showAddForm ? '✕ Cancel' : '+ Add New Listing'}
+            {showAddForm ? 'Cancel' : '+ Add New Listing'}
           </button>
         </div>
 
-        {/* Add Listing Form */}
         {showAddForm && (
-          <form
-            onSubmit={handleAddListing}
-            style={{
-              background: 'white',
-              padding: 30,
-              borderRadius: 16,
-              boxShadow: '0 4px 20px rgba(0,0,0,0.06)',
-              marginBottom: 40,
-            }}
-          >
-            <h2 style={{ margin: '0 0 24px 0', color: '#1C1209' }}>
-              Create New Listing
-            </h2>
-
-            {/* Image Upload */}
+          <form onSubmit={handleAddListing} style={{ background: 'white', padding: 30, borderRadius: 16, boxShadow: '0 4px 20px rgba(0,0,0,0.06)', marginBottom: 40 }}>
+            <h2 style={{ margin: '0 0 24px 0', color: '#1C1209' }}>Create New Listing</h2>
+            
             <div style={{ marginBottom: 24 }}>
-              <label
-                style={{
-                  display: 'block',
-                  marginBottom: 8,
-                  fontWeight: 600,
-                  color: '#1C1209',
-                }}
-              >
-                Property Images 📸
-              </label>
+              <label style={{ display: 'block', marginBottom: 8, fontWeight: 600, color: '#1C1209' }}>Property Images</label>
               <input
                 type="file"
                 accept="image/*"
                 multiple
                 onChange={handleImageChange}
-                style={{
-                  width: '100%',
-                  padding: '12px',
-                  border: '2px dashed #DDD0C4',
-                  borderRadius: 8,
-                  cursor: 'pointer',
-                }}
+                style={{ width: '100%', padding: '12px', border: '2px dashed #DDD0C4', borderRadius: 8, cursor: 'pointer' }}
               />
-              <p style={{ fontSize: 12, color: '#6B5B4E', marginTop: 6 }}>
-                Upload multiple images (JPG, PNG)
-              </p>
-
-              {/* Image Previews */}
+              <p style={{ fontSize: 12, color: '#6B5B4E', marginTop: 6 }}>Upload multiple images (JPG, PNG)</p>
+              
               {imagePreviews.length > 0 && (
-                <div
-                  style={{
-                    display: 'grid',
-                    gridTemplateColumns:
-                      'repeat(auto-fill, minmax(100px, 1fr))',
-                    gap: 10,
-                    marginTop: 16,
-                  }}
-                >
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(100px, 1fr))', gap: 10, marginTop: 16 }}>
                   {imagePreviews.map((preview, index) => (
-                    <div
-                      key={index}
-                      style={{
-                        position: 'relative',
-                        borderRadius: 8,
-                        overflow: 'hidden',
-                        aspectRatio: '1',
-                      }}
-                    >
-                      <img
-                        src={preview}
-                        alt={`Preview ${index}`}
-                        style={{
-                          width: '100%',
-                          height: '100%',
-                          objectFit: 'cover',
-                        }}
-                      />
+                    <div key={index} style={{ position: 'relative', borderRadius: 8, overflow: 'hidden', aspectRatio: '1' }}>
+                      <img src={preview} alt={`Preview ${index}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                     </div>
                   ))}
                 </div>
               )}
             </div>
 
-            <div
-              style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
-                gap: 16,
-              }}
-            >
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: 16 }}>
               <input
                 placeholder="Property Name"
                 value={formData.name}
-                onChange={(e) =>
-                  setFormData({ ...formData, name: e.target.value })
-                }
+                onChange={(e) => setFormData({...formData, name: e.target.value})}
                 required
-                style={{
-                  padding: '12px 16px',
-                  border: '2px solid #DDD0C4',
-                  borderRadius: 8,
-                  fontSize: 14,
-                }}
+                style={{ padding: '12px 16px', border: '2px solid #DDD0C4', borderRadius: 8, fontSize: 14 }}
               />
               <select
                 value={formData.type}
-                onChange={(e) =>
-                  setFormData({ ...formData, type: e.target.value })
-                }
-                style={{
-                  padding: '12px 16px',
-                  border: '2px solid #DDD0C4',
-                  borderRadius: 8,
-                  fontSize: 14,
-                }}
+                onChange={(e) => setFormData({...formData, type: e.target.value})}
+                style={{ padding: '12px 16px', border: '2px solid #DDD0C4', borderRadius: 8, fontSize: 14 }}
               >
                 <option>Bedsitter</option>
                 <option>Single Room</option>
@@ -544,97 +337,48 @@ export default function Dashboard() {
                 type="number"
                 placeholder="Price (KSh/month)"
                 value={formData.price}
-                onChange={(e) =>
-                  setFormData({ ...formData, price: e.target.value })
-                }
+                onChange={(e) => setFormData({...formData, price: e.target.value})}
                 required
-                style={{
-                  padding: '12px 16px',
-                  border: '2px solid #DDD0C4',
-                  borderRadius: 8,
-                  fontSize: 14,
-                }}
+                style={{ padding: '12px 16px', border: '2px solid #DDD0C4', borderRadius: 8, fontSize: 14 }}
               />
               <input
                 type="number"
                 placeholder="Deposit (KSh)"
                 value={formData.deposit}
-                onChange={(e) =>
-                  setFormData({ ...formData, deposit: e.target.value })
-                }
-                style={{
-                  padding: '12px 16px',
-                  border: '2px solid #DDD0C4',
-                  borderRadius: 8,
-                  fontSize: 14,
-                }}
+                onChange={(e) => setFormData({...formData, deposit: e.target.value})}
+                style={{ padding: '12px 16px', border: '2px solid #DDD0C4', borderRadius: 8, fontSize: 14 }}
               />
               <input
                 placeholder="Area/Location"
                 value={formData.area}
-                onChange={(e) =>
-                  setFormData({ ...formData, area: e.target.value })
-                }
+                onChange={(e) => setFormData({...formData, area: e.target.value})}
                 required
-                style={{
-                  padding: '12px 16px',
-                  border: '2px solid #DDD0C4',
-                  borderRadius: 8,
-                  fontSize: 14,
-                }}
+                style={{ padding: '12px 16px', border: '2px solid #DDD0C4', borderRadius: 8, fontSize: 14 }}
               />
               <input
                 placeholder="City"
                 value={formData.city}
-                onChange={(e) =>
-                  setFormData({ ...formData, city: e.target.value })
-                }
+                onChange={(e) => setFormData({...formData, city: e.target.value})}
                 required
-                style={{
-                  padding: '12px 16px',
-                  border: '2px solid #DDD0C4',
-                  borderRadius: 8,
-                  fontSize: 14,
-                }}
+                style={{ padding: '12px 16px', border: '2px solid #DDD0C4', borderRadius: 8, fontSize: 14 }}
               />
               <input
                 placeholder="Nearest Institution"
                 value={formData.institution}
-                onChange={(e) =>
-                  setFormData({ ...formData, institution: e.target.value })
-                }
+                onChange={(e) => setFormData({...formData, institution: e.target.value})}
                 required
-                style={{
-                  padding: '12px 16px',
-                  border: '2px solid #DDD0C4',
-                  borderRadius: 8,
-                  fontSize: 14,
-                }}
+                style={{ padding: '12px 16px', border: '2px solid #DDD0C4', borderRadius: 8, fontSize: 14 }}
               />
               <input
                 placeholder="Distance (e.g., 500m from campus)"
                 value={formData.distance}
-                onChange={(e) =>
-                  setFormData({ ...formData, distance: e.target.value })
-                }
-                style={{
-                  padding: '12px 16px',
-                  border: '2px solid #DDD0C4',
-                  borderRadius: 8,
-                  fontSize: 14,
-                }}
+                onChange={(e) => setFormData({...formData, distance: e.target.value})}
+                style={{ padding: '12px 16px', border: '2px solid #DDD0C4', borderRadius: 8, fontSize: 14 }}
               />
               <select
                 value={formData.gender}
-                onChange={(e) =>
-                  setFormData({ ...formData, gender: e.target.value })
-                }
-                style={{
-                  padding: '12px 16px',
-                  border: '2px solid #DDD0C4',
-                  borderRadius: 8,
-                  fontSize: 14,
-                }}
+                onChange={(e) => setFormData({...formData, gender: e.target.value})}
+                style={{ padding: '12px 16px', border: '2px solid #DDD0C4', borderRadius: 8, fontSize: 14 }}
               >
                 <option>Mixed</option>
                 <option>Ladies Only</option>
@@ -645,176 +389,78 @@ export default function Dashboard() {
             <textarea
               placeholder="Description"
               value={formData.description}
-              onChange={(e) =>
-                setFormData({ ...formData, description: e.target.value })
-              }
+              onChange={(e) => setFormData({...formData, description: e.target.value})}
               rows={4}
-              style={{
-                width: '100%',
-                padding: '12px 16px',
-                border: '2px solid #DDD0C4',
-                borderRadius: 8,
-                fontSize: 14,
-                marginTop: 16,
-                boxSizing: 'border-box',
-              }}
+              style={{ width: '100%', padding: '12px 16px', border: '2px solid #DDD0C4', borderRadius: 8, fontSize: 14, marginTop: 16, boxSizing: 'border-box' }}
             />
 
-            <button
+            <button 
               type="submit"
               disabled={uploadingImages}
-              style={{
+              style={{ 
                 marginTop: 20,
-                padding: '14px 32px',
-                background: uploadingImages ? '#999' : '#2A7A5A',
-                color: 'white',
-                border: 'none',
-                borderRadius: 10,
-                cursor: uploadingImages ? 'not-allowed' : 'pointer',
+                padding: '14px 32px', 
+                background: uploadingImages ? '#999' : '#2A7A5A', 
+                color: 'white', 
+                border: 'none', 
+                borderRadius: 10, 
+                cursor: uploadingImages ? 'not-allowed' : 'pointer', 
                 fontWeight: 700,
-                fontSize: 15,
+                fontSize: 15
               }}
             >
-              {uploadingImages
-                ? '⏳ Uploading Images...'
-                : 'Submit for Approval'}
+              {uploadingImages ? 'Uploading Images...' : 'Submit for Approval'}
             </button>
           </form>
         )}
 
-        {/* Listings */}
-        <h2 style={{ margin: '0 0 24px 0', color: '#1C1209' }}>
-          Your Listings
-        </h2>
-
+        <h2 style={{ margin: '0 0 24px 0', color: '#1C1209' }}>Your Listings</h2>
+        
         {listings.length === 0 ? (
-          <div
-            style={{
-              textAlign: 'center',
-              padding: 60,
-              background: 'white',
-              borderRadius: 16,
-            }}
-          >
-            <div style={{ fontSize: 64, marginBottom: 20 }}>📭</div>
-            <h3 style={{ color: '#1C1209', marginBottom: 12 }}>
-              No listings yet
-            </h3>
-            <p style={{ color: '#6B5B4E' }}>
-              Click "Add New Listing" to get started
-            </p>
+          <div style={{ textAlign: 'center', padding: 60, background: 'white', borderRadius: 16 }}>
+            <div style={{ fontSize: 64, marginBottom: 20 }}>No listings yet</div>
+            <h3 style={{ color: '#1C1209', marginBottom: 12 }}>Click Add New Listing to get started</h3>
           </div>
         ) : (
           <div style={{ display: 'grid', gap: 16 }}>
             {listings.map((listing) => (
-              <div
-                key={listing.id}
-                style={{
-                  background: 'white',
-                  padding: 24,
-                  borderRadius: 12,
-                  boxShadow: '0 2px 12px rgba(0,0,0,0.06)',
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  flexWrap: 'wrap',
-                  gap: 16,
-                }}
-              >
+              <div key={listing.id} style={{ background: 'white', padding: 24, borderRadius: 12, boxShadow: '0 2px 12px rgba(0,0,0,0.06)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 16 }}>
                 <div style={{ display: 'flex', gap: 16, alignItems: 'center' }}>
-                  {listing.images?.[0] && (
-                    <img
-                      src={listing.images[0]}
+                  {listing.images && listing.images.length > 0 && (
+                    <img 
+                      src={listing.images[0]} 
                       alt={listing.name}
-                      style={{
-                        width: 80,
-                        height: 80,
-                        objectFit: 'cover',
-                        borderRadius: 8,
-                      }}
+                      style={{ width: 80, height: 80, objectFit: 'cover', borderRadius: 8 }}
                     />
                   )}
                   <div>
-                    <h3 style={{ margin: '0 0 6px 0', color: '#1C1209' }}>
-                      {listing.name}
-                    </h3>
-                    <p
-                      style={{
-                        margin: '0 0 8px 0',
-                        color: '#6B5B4E',
-                        fontSize: 14,
-                      }}
-                    >
-                      📍 {listing.area}, {listing.city}
-                    </p>
+                    <h3 style={{ margin: '0 0 6px 0', color: '#1C1209' }}>{listing.name}</h3>
+                    <p style={{ margin: '0 0 8px 0', color: '#6B5B4E', fontSize: 14 }}>{listing.area}, {listing.city}</p>
                     <div style={{ display: 'flex', gap: 12, fontSize: 14 }}>
-                      <span
-                        style={{
-                          background: '#F0EAE3',
-                          padding: '4px 10px',
-                          borderRadius: 6,
-                        }}
-                      >
-                        {listing.type}
-                      </span>
-                      <span style={{ fontWeight: 700, color: '#D4873A' }}>
-                        KSh {listing.price?.toLocaleString()}/mo
-                      </span>
+                      <span style={{ background: '#F0EAE3', padding: '4px 10px', borderRadius: 6 }}>{listing.type}</span>
+                      <span style={{ fontWeight: 700, color: '#D4873A' }}>KSh {listing.price?.toLocaleString()}/mo</span>
                     </div>
                   </div>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                  <span
-                    style={{
-                      padding: '6px 14px',
-                      borderRadius: 6,
-                      fontSize: 12,
-                      fontWeight: 600,
-                      background:
-                        listing.status === 'approved'
-                          ? '#D4EDDA'
-                          : listing.status === 'pending'
-                          ? '#FFF3CD'
-                          : '#F8D7DA',
-                      color:
-                        listing.status === 'approved'
-                          ? '#155724'
-                          : listing.status === 'pending'
-                          ? '#856404'
-                          : '#721C24',
-                    }}
-                  >
-                    {listing.status === 'approved'
-                      ? '✓ Approved'
-                      : listing.status === 'pending'
-                      ? '⏳ Pending'
-                      : '✕ Rejected'}
+                  <span style={{ 
+                    padding: '6px 14px', 
+                    borderRadius: 6, 
+                    fontSize: 12, 
+                    fontWeight: 600,
+                    background: listing.status === 'approved' ? '#D4EDDA' : listing.status === 'pending' ? '#FFF3CD' : '#F8D7DA',
+                    color: listing.status === 'approved' ? '#155724' : listing.status === 'pending' ? '#856404' : '#721C24'
+                  }}>
+                    {listing.status === 'approved' ? 'Approved' : listing.status === 'pending' ? 'Pending' : 'Rejected'}
                   </span>
                   {listing.is_verified && (
-                    <span
-                      style={{
-                        background: 'linear-gradient(135deg, #007BFF, #0056b3)',
-                        color: 'white',
-                        padding: '6px 14px',
-                        borderRadius: 6,
-                        fontSize: 12,
-                        fontWeight: 700,
-                      }}
-                    >
-                      ★ VERIFIED
+                    <span style={{ background: 'linear-gradient(135deg, #007BFF, #0056b3)', color: 'white', padding: '6px 14px', borderRadius: 6, fontSize: 12, fontWeight: 700 }}>
+                      VERIFIED
                     </span>
                   )}
-                  <button
+                  <button 
                     onClick={() => deleteListing(listing.id)}
-                    style={{
-                      padding: '8px 16px',
-                      background: '#F8D7DA',
-                      color: '#721C24',
-                      border: 'none',
-                      borderRadius: 6,
-                      cursor: 'pointer',
-                      fontWeight: 600,
-                    }}
+                    style={{ padding: '8px 16px', background: '#F8D7DA', color: '#721C24', border: 'none', borderRadius: 6, cursor: 'pointer', fontWeight: 600 }}
                   >
                     Delete
                   </button>
@@ -825,5 +471,5 @@ export default function Dashboard() {
         )}
       </div>
     </div>
-  );
+  )
 }
