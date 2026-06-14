@@ -16,6 +16,9 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true)
   const [showAddForm, setShowAddForm] = useState(false)
   const [uploadingImages, setUploadingImages] = useState(false)
+  const [showPaymentModal, setShowPaymentModal] = useState(false)
+  const [phoneNumber, setPhoneNumber] = useState('')
+  const [processingPayment, setProcessingPayment] = useState(false)
   const router = useRouter()
 
   const [formData, setFormData] = useState({
@@ -167,6 +170,49 @@ export default function Dashboard() {
     }
   }
 
+  // M-Pesa Payment Function
+  async function handlePayment() {
+    if (!phoneNumber || phoneNumber.length < 10) {
+      alert('Please enter a valid phone number')
+      return
+    }
+
+    setProcessingPayment(true)
+    
+    // Format phone number (remove 0, add 254)
+    let formattedPhone = phoneNumber.replace(/\D/g, '')
+    if (formattedPhone.startsWith('0')) {
+      formattedPhone = '254' + formattedPhone.substring(1)
+    } else if (!formattedPhone.startsWith('254')) {
+      formattedPhone = '254' + formattedPhone
+    }
+
+    try {
+      const response = await fetch('/api/mpesa', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          phoneNumber: formattedPhone,
+          amount: 500 // Verification fee amount
+        })
+      })
+
+      const data = await response.json()
+
+      if (data.ResponseCode === '0') {
+        alert('Payment request sent! Check your phone to enter PIN.')
+        setShowPaymentModal(false)
+      } else {
+        alert('Payment failed: ' + (data.errorMessage || 'Unknown error'))
+      }
+    } catch (error) {
+      console.error('Payment error:', error)
+      alert('Failed to initiate payment. Please try again.')
+    } finally {
+      setProcessingPayment(false)
+    }
+  }
+
   async function deleteListing(id: string) {
     if (!confirm('Delete this listing?')) return
 
@@ -245,12 +291,13 @@ export default function Dashboard() {
         color: 'white'
       }}>
         <h1 style={{ fontSize: 32, fontWeight: 700, margin: '0 0 8px 0' }}>
-          Welcome back, {profile?.name || 'Landlord'}!
+          Welcome back, {profile?.name || 'Landlord'}! 👋
         </h1>
         <p style={{ margin: 0, opacity: 0.9 }}>Manage your student accommodation listings</p>
       </div>
 
       <div style={{ padding: '40px 60px', maxWidth: 1400, margin: '0 auto' }}>
+        {/* Stats Cards */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: 20, marginBottom: 40 }}>
           <div style={{ background: 'white', padding: 30, borderRadius: 16, boxShadow: '0 4px 20px rgba(0,0,0,0.06)' }}>
             <div style={{ fontSize: 36, fontWeight: 800, color: '#D4873A', marginBottom: 8 }}>{stats.total}</div>
@@ -266,6 +313,63 @@ export default function Dashboard() {
           </div>
         </div>
 
+        {/* Verification Badge Section */}
+        {!profile?.is_verified && (
+          <div style={{ 
+            background: 'linear-gradient(135deg, #FFD700 0%, #FFA500 100%)', 
+            padding: 30, 
+            borderRadius: 16, 
+            marginBottom: 40,
+            boxShadow: '0 4px 20px rgba(0,0,0,0.1)',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            flexWrap: 'wrap',
+            gap: 20
+          }}>
+            <div>
+              <h2 style={{ margin: '0 0 8px 0', color: '#1C1209', fontSize: 24 }}>🏆 Get Verified Badge</h2>
+              <p style={{ margin: 0, color: '#333', fontSize: 14 }}>Pay KSh 500 to get a verified badge and increase trust with students</p>
+            </div>
+            <button 
+              onClick={() => setShowPaymentModal(true)}
+              style={{ 
+                padding: '14px 32px', 
+                background: '#1C1209', 
+                color: 'white', 
+                border: 'none', 
+                borderRadius: 10, 
+                cursor: 'pointer', 
+                fontWeight: 700,
+                fontSize: 15,
+                whiteSpace: 'nowrap'
+              }}
+            >
+              Pay Now with M-Pesa
+            </button>
+          </div>
+        )}
+
+        {profile?.is_verified && (
+          <div style={{ 
+            background: 'linear-gradient(135deg, #2A7A5A 0%, #1C5A42 100%)', 
+            padding: 30, 
+            borderRadius: 16, 
+            marginBottom: 40,
+            boxShadow: '0 4px 20px rgba(0,0,0,0.1)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 16
+          }}>
+            <div style={{ fontSize: 48 }}>⭐</div>
+            <div>
+              <h2 style={{ margin: '0 0 4px 0', color: 'white', fontSize: 24 }}>Verified Landlord</h2>
+              <p style={{ margin: 0, color: '#E0F0E8', fontSize: 14 }}>You have a verified badge - students trust you more!</p>
+            </div>
+          </div>
+        )}
+
+        {/* Add Listing Button */}
         <div style={{ marginBottom: 30 }}>
           <button 
             onClick={() => setShowAddForm(!showAddForm)}
@@ -287,6 +391,7 @@ export default function Dashboard() {
           </button>
         </div>
 
+        {/* Add Listing Form */}
         {showAddForm && (
           <form onSubmit={handleAddListing} style={{ background: 'white', padding: 30, borderRadius: 16, boxShadow: '0 4px 20px rgba(0,0,0,0.06)', marginBottom: 40 }}>
             <h2 style={{ margin: '0 0 24px 0', color: '#1C1209' }}>Create New Listing</h2>
@@ -414,12 +519,14 @@ export default function Dashboard() {
           </form>
         )}
 
+        {/* Listings */}
         <h2 style={{ margin: '0 0 24px 0', color: '#1C1209' }}>Your Listings</h2>
         
         {listings.length === 0 ? (
           <div style={{ textAlign: 'center', padding: 60, background: 'white', borderRadius: 16 }}>
-            <div style={{ fontSize: 64, marginBottom: 20 }}>No listings yet</div>
-            <h3 style={{ color: '#1C1209', marginBottom: 12 }}>Click Add New Listing to get started</h3>
+            <div style={{ fontSize: 64, marginBottom: 20 }}>📭</div>
+            <h3 style={{ color: '#1C1209', marginBottom: 12 }}>No listings yet</h3>
+            <p style={{ color: '#6B5B4E' }}>Click "Add New Listing" to get started</p>
           </div>
         ) : (
           <div style={{ display: 'grid', gap: 16 }}>
@@ -470,6 +577,88 @@ export default function Dashboard() {
           </div>
         )}
       </div>
+
+      {/* Payment Modal */}
+      {showPaymentModal && (
+        <div style={{ 
+          position: 'fixed', 
+          inset: 0, 
+          background: 'rgba(0,0,0,0.7)', 
+          display: 'flex', 
+          alignItems: 'center', 
+          justifyContent: 'center',
+          zIndex: 1000
+        }}>
+          <div style={{ 
+            background: 'white', 
+            padding: 40, 
+            borderRadius: 16, 
+            maxWidth: 400, 
+            width: '90%',
+            boxShadow: '0 20px 60px rgba(0,0,0,0.3)'
+          }}>
+            <h2 style={{ margin: '0 0 16px 0', color: '#1C1209', textAlign: 'center' }}>💳 M-Pesa Payment</h2>
+            <p style={{ color: '#6B5B4E', textAlign: 'center', marginBottom: 24 }}>
+              Pay KSh 500 to get your verified badge
+            </p>
+            
+            <div style={{ marginBottom: 20 }}>
+              <label style={{ display: 'block', marginBottom: 8, fontWeight: 600, color: '#1C1209' }}>M-Pesa Phone Number</label>
+              <input
+                type="tel"
+                placeholder="254712345678"
+                value={phoneNumber}
+                onChange={(e) => setPhoneNumber(e.target.value)}
+                style={{ 
+                  width: '100%', 
+                  padding: '12px 16px', 
+                  border: '2px solid #DDD0C4', 
+                  borderRadius: 8, 
+                  fontSize: 16,
+                  boxSizing: 'border-box'
+                }}
+              />
+              <p style={{ fontSize: 12, color: '#6B5B4E', marginTop: 6 }}>
+                Enter your M-Pesa number (e.g., 254712345678)
+              </p>
+            </div>
+
+            <div style={{ display: 'flex', gap: 12 }}>
+              <button 
+                onClick={() => setShowPaymentModal(false)}
+                style={{ 
+                  flex: 1, 
+                  padding: '12px', 
+                  background: '#f0f0f0', 
+                  color: '#333', 
+                  border: 'none', 
+                  borderRadius: 8, 
+                  cursor: 'pointer', 
+                  fontWeight: 600 
+                }}
+              >
+                Cancel
+              </button>
+              <button 
+                onClick={handlePayment}
+                disabled={processingPayment}
+                style={{ 
+                  flex: 1, 
+                  padding: '12px', 
+                  background: processingPayment ? '#999' : '#2A7A5A', 
+                  color: 'white', 
+                  border: 'none', 
+                  borderRadius: 8, 
+                  cursor: processingPayment ? 'not-allowed' : 'pointer', 
+                  fontWeight: 700 
+                }}
+              >
+                {processingPayment ? 'Processing...' : 'Pay KSh 500'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
