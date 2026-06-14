@@ -193,7 +193,7 @@ export default function Dashboard() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           phoneNumber: formattedPhone,
-          amount: 500 // Verification fee amount
+          amount: 1000 // Account verification fee
         })
       })
 
@@ -329,7 +329,7 @@ export default function Dashboard() {
           }}>
             <div>
               <h2 style={{ margin: '0 0 8px 0', color: '#1C1209', fontSize: 24 }}>🏆 Get Verified Badge</h2>
-              <p style={{ margin: 0, color: '#333', fontSize: 14 }}>Pay KSh 500 to get a verified badge and increase trust with students</p>
+              <p style={{ margin: 0, color: '#333', fontSize: 14 }}>Pay KSh 1,000 to get a verified badge and increase trust with students</p>
             </div>
             <button 
               onClick={() => setShowPaymentModal(true)}
@@ -597,9 +597,16 @@ export default function Dashboard() {
             width: '90%',
             boxShadow: '0 20px 60px rgba(0,0,0,0.3)'
           }}>
-            <h2 style={{ margin: '0 0 16px 0', color: '#1C1209', textAlign: 'center' }}>💳 M-Pesa Payment</h2>
+            <h2 style={{ margin: '0 0 16px 0', color: '#1C1209', textAlign: 'center', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12 }}>
+              {/* M-Pesa Logo */}
+              <img 
+                src="https://upload.wikimedia.org/wikipedia/commons/thumb/1/15/M-PESA_LOGO-f019d0c0c1.png/320px-M-PESA_LOGO-f019d0c0c1.png"
+                alt="M-Pesa"
+                style={{ height: '40px', width: 'auto' }}
+              />
+            </h2>
             <p style={{ color: '#6B5B4E', textAlign: 'center', marginBottom: 24 }}>
-              Pay KSh 500 to get your verified badge
+              Pay KSh 1,000 to get your verified badge
             </p>
             
             <div style={{ marginBottom: 20 }}>
@@ -653,7 +660,7 @@ export default function Dashboard() {
                   fontWeight: 700 
                 }}
               >
-                {processingPayment ? 'Processing...' : 'Pay KSh 500'}
+                {processingPayment ? 'Processing...' : 'Pay KSh 1,000'}
               </button>
             </div>
           </div>
