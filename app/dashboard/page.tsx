@@ -598,12 +598,11 @@ export default function Dashboard() {
             boxShadow: '0 20px 60px rgba(0,0,0,0.3)'
           }}>
             <h2 style={{ margin: '0 0 16px 0', color: '#1C1209', textAlign: 'center', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12 }}>
-              {/* M-Pesa Logo */}
-              <img 
-                src="https://upload.wikimedia.org/wikipedia/commons/thumb/1/15/M-PESA_LOGO-f019d0c0c1.png/320px-M-PESA_LOGO-f019d0c0c1.png"
-                alt="M-Pesa"
-                style={{ height: '40px', width: 'auto' }}
-              />
+              {/* M-Pesa Logo - Inline SVG */}
+              <svg width="120" height="40" viewBox="0 0 120 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <rect width="120" height="40" rx="4" fill="#00C35D"/>
+                <text x="60" y="25" fontFamily="Arial, sans-serif" fontSize="18" fontWeight="bold" fill="white" textAnchor="middle">M-Pesa</text>
+              </svg>
             </h2>
             <p style={{ color: '#6B5B4E', textAlign: 'center', marginBottom: 24 }}>
               Pay KSh 1,000 to get your verified badge
