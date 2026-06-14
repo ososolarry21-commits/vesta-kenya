@@ -10,7 +10,7 @@ const supabase = createClient(
 export default function Home() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const [showPassword, setShowPassword] = useState(false) // New state for password visibility
+  const [showPassword, setShowPassword] = useState(false)
   const [role, setRole] = useState<'student' | 'landlord'>('student')
   const [msg, setMsg] = useState('')
   const [loading, setLoading] = useState(false)
@@ -72,6 +72,13 @@ export default function Home() {
         .select('role')
         .eq('id', data.user.id)
         .single()
+
+      // STRICT ROLE CHECK: Prevents cross-login confusion
+      if (profile && profile.role !== role) {
+        setMsg(`⚠️ This account is registered as a ${profile.role}. Please select the ${profile.role} button to log in.`)
+        setLoading(false)
+        return
+      }
 
       if (profile?.role === 'student') {
         window.location.href = '/browse'
@@ -157,7 +164,7 @@ export default function Home() {
             onChange={(e) => setPassword(e.target.value)}
             style={{ 
               width: '100%', 
-              padding: '12px 40px 12px 14px', /* Extra padding on the right for the button */
+              padding: '12px 45px 12px 14px', 
               boxSizing: 'border-box', 
               border: '1px solid #DDD0C4', 
               borderRadius: 8, 
@@ -178,9 +185,8 @@ export default function Home() {
               background: 'transparent',
               border: 'none',
               cursor: 'pointer',
-              fontSize: 18,
-              color: '#6B5B4E',
-              padding: 0,
+              fontSize: '20px',
+              padding: '4px',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center'
@@ -220,9 +226,6 @@ export default function Home() {
               🏠 Landlord
             </button>
           </div>
-          <p style={{ fontSize: 11, color: '#6B5B4E', marginTop: 6, textAlign: 'center' }}>
-            Current selection: <strong>{role.toUpperCase()}</strong>
-          </p>
         </div>
         
         {/* Login and Signup Buttons */}
@@ -245,7 +248,7 @@ export default function Home() {
 
         {/* Error/Success Message */}
         {msg && (
-          <div style={{ padding: 12, background: '#F8D7DA', color: '#721C24', borderRadius: 8, fontSize: 13, textAlign: 'center', marginBottom: 16 }}>
+          <div style={{ padding: 12, background: '#F8D7DA', color: '#721C24', borderRadius: 8, fontSize: 13, textAlign: 'center', marginBottom: 16, border: '1px solid #F5C6CB' }}>
             {msg}
           </div>
         )}
