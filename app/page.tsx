@@ -10,6 +10,7 @@ const supabase = createClient(
 export default function Home() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [showPassword, setShowPassword] = useState(false) // New state for password visibility
   const [role, setRole] = useState<'student' | 'landlord'>('student')
   const [msg, setMsg] = useState('')
   const [loading, setLoading] = useState(false)
@@ -147,25 +148,48 @@ export default function Home() {
           }}
         />
         
-        {/* Password Input */}
-        <input
-          type="password"
-          placeholder="Password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          style={{ 
-            width: '100%', 
-            padding: '12px 14px', 
-            marginBottom: 16, 
-            boxSizing: 'border-box', 
-            border: '1px solid #DDD0C4', 
-            borderRadius: 8, 
-            fontSize: 16,
-            color: '#000000',
-            background: '#FFFFFF',
-            outline: 'none'
-          }}
-        />
+        {/* Password Input with Show/Hide Toggle */}
+        <div style={{ position: 'relative', marginBottom: 16 }}>
+          <input
+            type={showPassword ? 'text' : 'password'}
+            placeholder="Password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            style={{ 
+              width: '100%', 
+              padding: '12px 40px 12px 14px', /* Extra padding on the right for the button */
+              boxSizing: 'border-box', 
+              border: '1px solid #DDD0C4', 
+              borderRadius: 8, 
+              fontSize: 16,
+              color: '#000000',
+              background: '#FFFFFF',
+              outline: 'none'
+            }}
+          />
+          <button
+            type="button"
+            onClick={() => setShowPassword(!showPassword)}
+            style={{
+              position: 'absolute',
+              right: '12px',
+              top: '50%',
+              transform: 'translateY(-50%)',
+              background: 'transparent',
+              border: 'none',
+              cursor: 'pointer',
+              fontSize: 18,
+              color: '#6B5B4E',
+              padding: 0,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center'
+            }}
+            title={showPassword ? 'Hide password' : 'Show password'}
+          >
+            {showPassword ? '🙈' : '👁️'}
+          </button>
+        </div>
 
         {/* Role Selection */}
         <div style={{ marginBottom: 20 }}>
