@@ -192,7 +192,8 @@ export default function Dashboard() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           phoneNumber: formattedPhone,
-          amount: 1000
+          amount: 1000,
+          email: user.email // We are now sending the email to link the payment!
         })
       })
 
@@ -313,7 +314,7 @@ export default function Dashboard() {
         </div>
 
         {/* Verification Badge Section */}
-        {!profile?.is_verified && (
+        {!profile?.verified && (
           <div style={{ 
             background: 'linear-gradient(135deg, #FFD700 0%, #FFA500 100%)', 
             padding: 30, 
@@ -349,7 +350,7 @@ export default function Dashboard() {
           </div>
         )}
 
-        {profile?.is_verified && (
+        {profile?.verified && (
           <div style={{ 
             background: 'linear-gradient(135deg, #2A7A5A 0%, #1C5A42 100%)', 
             padding: 30, 

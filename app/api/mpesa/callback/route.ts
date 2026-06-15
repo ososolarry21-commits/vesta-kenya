@@ -11,30 +11,49 @@ export async function POST(request: Request) {
     const body = await request.json()
     const { Body } = body
     
-    // Extract the result code and merchant request ID
     const resultCode = Body.stkCallback.ResultCode
-    const merchantRequestId = Body.stkCallback.MerchantRequestID
+    
+    console.log('M-Pesa Callback received:', { resultCode })
     
     if (resultCode === 0) {
-      // Payment successful
       const metadata = Body.stkCallback.CallbackMetadata.Item
       
       const mpesaReceipt = metadata.find((item: any) => item.Name === 'MpesaReceiptNumber')?.Value
-      const amount = metadata.find((item: any) => item.Name === 'Amount')?.Value
-      const phoneNumber = metadata.find((item: any) => item.Name === 'PhoneNumber')?.Value
       
-      // Here you would update the landlord's profile to mark them as verified
-      // For now, we'll just log it
-      console.log('Payment successful:', {
-        receipt: mpesaReceipt,
-        amount,
-        phoneNumber
-      })
+      // Get the email from AccountReference
+      const accountReference = metadata.find((item: any) => item.Name === 'AccountReference')?.Value
+      const userEmail = accountReference
+
+      console.log('Payment successful for:', userEmail)
       
-      // TODO: Update landlord profile in database
-      // await supabase.from('profiles').update({ is_verified: true }).eq('phone', phoneNumber)
+      if (userEmail) {
+        // Find user by email and mark as verified
+        const { data: userProfile, error: fetchError } = await supabase
+          .from('profiles')
+          .select('id')
+          .eq('email', userEmail)
+          .single()
+        
+        if (fetchError) {
+          console.error('Error finding user:', fetchError)
+        } else if (userProfile) {
+          const { error: updateError } = await supabase
+            .from('profiles')
+            .update({ 
+              verified: true,
+              verified_at: new Date().toISOString(),
+              verification_receipt: mpesaReceipt
+            })
+            .eq('id', userProfile.id)
+          
+          if (updateError) {
+            console.error('Error updating verification:', updateError)
+          } else {
+            console.log('✅ User verified successfully!')
+          }
+        }
+      }
     } else {
-      // Payment failed or cancelled
       console.log('Payment failed or cancelled:', Body.stkCallback.ResultDesc)
     }
     
