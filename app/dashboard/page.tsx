@@ -179,7 +179,6 @@ export default function Dashboard() {
 
     setProcessingPayment(true)
     
-    // Format phone number (remove 0, add 254)
     let formattedPhone = phoneNumber.replace(/\D/g, '')
     if (formattedPhone.startsWith('0')) {
       formattedPhone = '254' + formattedPhone.substring(1)
@@ -193,7 +192,7 @@ export default function Dashboard() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           phoneNumber: formattedPhone,
-          amount: 1000 // Account verification fee
+          amount: 1000
         })
       })
 
@@ -328,7 +327,7 @@ export default function Dashboard() {
             gap: 20
           }}>
             <div>
-              <h2 style={{ margin: '0 0 8px 0', color: '#1C1209', fontSize: 24 }}>🏆 Get Verified Badge</h2>
+              <h2 style={{ margin: '0 0 8px 0', color: '#1C1209', fontSize: 24 }}> Get Verified Badge</h2>
               <p style={{ margin: 0, color: '#333', fontSize: 14 }}>Pay KSh 1,000 to get a verified badge and increase trust with students</p>
             </div>
             <button 
@@ -597,14 +596,15 @@ export default function Dashboard() {
             width: '90%',
             boxShadow: '0 20px 60px rgba(0,0,0,0.3)'
           }}>
-            <h2 style={{ margin: '0 0 16px 0', color: '#1C1209', textAlign: 'center', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12 }}>
-              {/* M-Pesa Logo - Inline SVG */}
-              <svg width="120" height="40" viewBox="0 0 120 40" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <rect width="120" height="40" rx="4" fill="#00C35D"/>
-                <text x="60" y="25" fontFamily="Arial, sans-serif" fontSize="18" fontWeight="bold" fill="white" textAnchor="middle">M-Pesa</text>
-              </svg>
+            <h2 style={{ margin: '0 0 16px 0', color: '#1C1209', textAlign: 'center', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              {/* Official M-Pesa Logo */}
+              <img 
+                src="/mpesa-logo.png"
+                alt="M-Pesa"
+                style={{ height: '50px', width: 'auto', objectFit: 'contain' }}
+              />
             </h2>
-            <p style={{ color: '#6B5B4E', textAlign: 'center', marginBottom: 24 }}>
+            <p style={{ color: '#6B5B4E', textAlign: 'center', marginBottom: 24, fontSize: 15 }}>
               Pay KSh 1,000 to get your verified badge
             </p>
             
@@ -651,7 +651,7 @@ export default function Dashboard() {
                 style={{ 
                   flex: 1, 
                   padding: '12px', 
-                  background: processingPayment ? '#999' : '#2A7A5A', 
+                  background: processingPayment ? '#999' : '#00C35D', 
                   color: 'white', 
                   border: 'none', 
                   borderRadius: 8, 
