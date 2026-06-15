@@ -19,38 +19,31 @@ export async function POST(request: Request) {
       const metadata = Body.stkCallback.CallbackMetadata.Item
       
       const mpesaReceipt = metadata.find((item: any) => item.Name === 'MpesaReceiptNumber')?.Value
+      const amount = metadata.find((item: any) => item.Name === 'Amount')?.Value
+      const phoneNumber = metadata.find((item: any) => item.Name === 'PhoneNumber')?.Value
       
-      // Get the email from AccountReference
+      // Get the listing ID from AccountReference
       const accountReference = metadata.find((item: any) => item.Name === 'AccountReference')?.Value
-      const userEmail = accountReference
+      // AccountReference format: "listingId:email"
+      const [listingId, email] = accountReference?.split(':') || []
 
-      console.log('Payment successful for:', userEmail)
+      console.log('Payment successful for listing:', listingId)
       
-      if (userEmail) {
-        // Find user by email and mark as verified
-        const { data: userProfile, error: fetchError } = await supabase
-          .from('profiles')
-          .select('id')
-          .eq('email', userEmail)
-          .single()
+      if (listingId) {
+        // Update the specific listing as verified
+        const { error: updateError } = await supabase
+          .from('listings')
+          .update({ 
+            is_verified: true,
+            verified_at: new Date().toISOString(),
+            verification_receipt: mpesaReceipt
+          })
+          .eq('id', listingId)
         
-        if (fetchError) {
-          console.error('Error finding user:', fetchError)
-        } else if (userProfile) {
-          const { error: updateError } = await supabase
-            .from('profiles')
-            .update({ 
-              verified: true,
-              verified_at: new Date().toISOString(),
-              verification_receipt: mpesaReceipt
-            })
-            .eq('id', userProfile.id)
-          
-          if (updateError) {
-            console.error('Error updating verification:', updateError)
-          } else {
-            console.log('✅ User verified successfully!')
-          }
+        if (updateError) {
+          console.error('Error updating listing verification:', updateError)
+        } else {
+          console.log('✅ Listing verified successfully!')
         }
       }
     } else {

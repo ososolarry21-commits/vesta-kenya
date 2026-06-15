@@ -23,13 +23,16 @@ async function getAccessToken() {
 
 export async function POST(request: Request) {
   try {
-    const { phoneNumber, amount, email } = await request.json()
+    const { phoneNumber, amount, email, listingId, listingName } = await request.json()
     
     const accessToken = await getAccessToken()
     const timestamp = new Date().toISOString().replace(/[^0-9]/g, '').slice(0, -3)
     const password = Buffer.from(`${SHORTCODE}${PASSKEY}${timestamp}`).toString('base64')
     
     const callBackURL = `${APP_URL}/api/mpesa/callback`
+    
+    // Use listingId:email as reference to track which property is being verified
+    const accountReference = `${listingId}:${email}`
     
     const response = await fetch(`${BASE_URL}/mpesa/stkpush/v1/processrequest`, {
       method: 'POST',
@@ -47,8 +50,8 @@ export async function POST(request: Request) {
         PartyB: SHORTCODE,
         PhoneNumber: phoneNumber,
         CallBackURL: callBackURL,
-        AccountReference: email, // We use the email as the reference!
-        TransactionDesc: 'Vesta Verification Fee'
+        AccountReference: accountReference,
+        TransactionDesc: `Verify Property: ${listingName}`
       })
     })
     

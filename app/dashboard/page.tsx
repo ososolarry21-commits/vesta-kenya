@@ -19,6 +19,7 @@ export default function Dashboard() {
   const [showPaymentModal, setShowPaymentModal] = useState(false)
   const [phoneNumber, setPhoneNumber] = useState('')
   const [processingPayment, setProcessingPayment] = useState(false)
+  const [selectedListing, setSelectedListing] = useState<any>(null)
   const router = useRouter()
 
   const [formData, setFormData] = useState({
@@ -170,10 +171,21 @@ export default function Dashboard() {
     }
   }
 
+  // Open payment modal for a specific listing
+  function openPaymentModal(listing: any) {
+    setSelectedListing(listing)
+    setShowPaymentModal(true)
+  }
+
   // M-Pesa Payment Function
   async function handlePayment() {
     if (!phoneNumber || phoneNumber.length < 10) {
       alert('Please enter a valid phone number')
+      return
+    }
+
+    if (!selectedListing) {
+      alert('No listing selected')
       return
     }
 
@@ -192,8 +204,10 @@ export default function Dashboard() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           phoneNumber: formattedPhone,
-          amount: 1000,
-          email: user.email // We are now sending the email to link the payment!
+          amount: 500, // Per property verification
+          email: user.email,
+          listingId: selectedListing.id,
+          listingName: selectedListing.name
         })
       })
 
@@ -202,6 +216,7 @@ export default function Dashboard() {
       if (data.ResponseCode === '0') {
         alert('Payment request sent! Check your phone to enter PIN.')
         setShowPaymentModal(false)
+        setPhoneNumber('')
       } else {
         alert('Payment failed: ' + (data.errorMessage || 'Unknown error'))
       }
@@ -312,62 +327,6 @@ export default function Dashboard() {
             <div style={{ color: '#6B5B4E', fontSize: 14 }}>Pending Approval</div>
           </div>
         </div>
-
-        {/* Verification Badge Section */}
-        {!profile?.verified && (
-          <div style={{ 
-            background: 'linear-gradient(135deg, #FFD700 0%, #FFA500 100%)', 
-            padding: 30, 
-            borderRadius: 16, 
-            marginBottom: 40,
-            boxShadow: '0 4px 20px rgba(0,0,0,0.1)',
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            flexWrap: 'wrap',
-            gap: 20
-          }}>
-            <div>
-              <h2 style={{ margin: '0 0 8px 0', color: '#1C1209', fontSize: 24 }}> Get Verified Badge</h2>
-              <p style={{ margin: 0, color: '#333', fontSize: 14 }}>Pay KSh 1,000 to get a verified badge and increase trust with students</p>
-            </div>
-            <button 
-              onClick={() => setShowPaymentModal(true)}
-              style={{ 
-                padding: '14px 32px', 
-                background: '#1C1209', 
-                color: 'white', 
-                border: 'none', 
-                borderRadius: 10, 
-                cursor: 'pointer', 
-                fontWeight: 700,
-                fontSize: 15,
-                whiteSpace: 'nowrap'
-              }}
-            >
-              Pay Now with M-Pesa
-            </button>
-          </div>
-        )}
-
-        {profile?.verified && (
-          <div style={{ 
-            background: 'linear-gradient(135deg, #2A7A5A 0%, #1C5A42 100%)', 
-            padding: 30, 
-            borderRadius: 16, 
-            marginBottom: 40,
-            boxShadow: '0 4px 20px rgba(0,0,0,0.1)',
-            display: 'flex',
-            alignItems: 'center',
-            gap: 16
-          }}>
-            <div style={{ fontSize: 48 }}>⭐</div>
-            <div>
-              <h2 style={{ margin: '0 0 4px 0', color: 'white', fontSize: 24 }}>Verified Landlord</h2>
-              <p style={{ margin: 0, color: '#E0F0E8', fontSize: 14 }}>You have a verified badge - students trust you more!</p>
-            </div>
-          </div>
-        )}
 
         {/* Add Listing Button */}
         <div style={{ marginBottom: 30 }}>
@@ -532,7 +491,7 @@ export default function Dashboard() {
           <div style={{ display: 'grid', gap: 16 }}>
             {listings.map((listing) => (
               <div key={listing.id} style={{ background: 'white', padding: 24, borderRadius: 12, boxShadow: '0 2px 12px rgba(0,0,0,0.06)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 16 }}>
-                <div style={{ display: 'flex', gap: 16, alignItems: 'center' }}>
+                <div style={{ display: 'flex', gap: 16, alignItems: 'center', flex: 1 }}>
                   {listing.images && listing.images.length > 0 && (
                     <img 
                       src={listing.images[0]} 
@@ -543,13 +502,13 @@ export default function Dashboard() {
                   <div>
                     <h3 style={{ margin: '0 0 6px 0', color: '#1C1209' }}>{listing.name}</h3>
                     <p style={{ margin: '0 0 8px 0', color: '#6B5B4E', fontSize: 14 }}>{listing.area}, {listing.city}</p>
-                    <div style={{ display: 'flex', gap: 12, fontSize: 14 }}>
+                    <div style={{ display: 'flex', gap: 12, fontSize: 14, flexWrap: 'wrap' }}>
                       <span style={{ background: '#F0EAE3', padding: '4px 10px', borderRadius: 6 }}>{listing.type}</span>
                       <span style={{ fontWeight: 700, color: '#D4873A' }}>KSh {listing.price?.toLocaleString()}/mo</span>
                     </div>
                   </div>
                 </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
                   <span style={{ 
                     padding: '6px 14px', 
                     borderRadius: 6, 
@@ -562,8 +521,25 @@ export default function Dashboard() {
                   </span>
                   {listing.is_verified && (
                     <span style={{ background: 'linear-gradient(135deg, #007BFF, #0056b3)', color: 'white', padding: '6px 14px', borderRadius: 6, fontSize: 12, fontWeight: 700 }}>
-                      VERIFIED
+                      ✓ VERIFIED
                     </span>
+                  )}
+                  {!listing.is_verified && listing.status === 'approved' && (
+                    <button 
+                      onClick={() => openPaymentModal(listing)}
+                      style={{ 
+                        padding: '8px 16px', 
+                        background: '#00C35D', 
+                        color: 'white', 
+                        border: 'none', 
+                        borderRadius: 6, 
+                        cursor: 'pointer', 
+                        fontWeight: 600,
+                        fontSize: 12
+                      }}
+                    >
+                      Verify - KSh 500
+                    </button>
                   )}
                   <button 
                     onClick={() => deleteListing(listing.id)}
@@ -579,7 +555,7 @@ export default function Dashboard() {
       </div>
 
       {/* Payment Modal */}
-      {showPaymentModal && (
+      {showPaymentModal && selectedListing && (
         <div style={{ 
           position: 'fixed', 
           inset: 0, 
@@ -597,11 +573,14 @@ export default function Dashboard() {
             width: '90%',
             boxShadow: '0 20px 60px rgba(0,0,0,0.3)'
           }}>
-           <h2 style={{ margin: '0 0 16px 0', color: '#00C35D', textAlign: 'center', fontSize: 28, fontWeight: 'bold' }}>
-  💚 Pay with M-Pesa
-</h2>
-            <p style={{ color: '#6B5B4E', textAlign: 'center', marginBottom: 24, fontSize: 15 }}>
-              Pay KSh 1,000 to get your verified badge
+            <h2 style={{ margin: '0 0 16px 0', color: '#00C35D', textAlign: 'center', fontSize: 28, fontWeight: 'bold' }}>
+              💚 Pay with M-Pesa
+            </h2>
+            <p style={{ color: '#6B5B4E', textAlign: 'center', marginBottom: 8, fontSize: 15 }}>
+              Verify: <strong>{selectedListing.name}</strong>
+            </p>
+            <p style={{ color: '#1C1209', textAlign: 'center', marginBottom: 24, fontSize: 24, fontWeight: 'bold' }}>
+              KSh 500
             </p>
             
             <div style={{ marginBottom: 20 }}>
@@ -627,7 +606,11 @@ export default function Dashboard() {
 
             <div style={{ display: 'flex', gap: 12 }}>
               <button 
-                onClick={() => setShowPaymentModal(false)}
+                onClick={() => {
+                  setShowPaymentModal(false)
+                  setPhoneNumber('')
+                  setSelectedListing(null)
+                }}
                 style={{ 
                   flex: 1, 
                   padding: '12px', 
@@ -655,7 +638,7 @@ export default function Dashboard() {
                   fontWeight: 700 
                 }}
               >
-                {processingPayment ? 'Processing...' : 'Pay KSh 1,000'}
+                {processingPayment ? 'Processing...' : 'Pay KSh 500'}
               </button>
             </div>
           </div>
