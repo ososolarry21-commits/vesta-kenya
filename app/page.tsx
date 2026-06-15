@@ -73,14 +73,29 @@ export default function Home() {
         .eq('id', data.user.id)
         .single()
 
-      // STRICT ROLE CHECK: Prevents cross-login confusion
-      if (profile && profile.role !== role) {
-        setMsg(`⚠️ This account is registered as a ${profile.role}. Please select the ${profile.role} button to log in.`)
+      const dbRole = profile?.role || 'student'
+
+      // 1. Handle Admin Accounts (Must select 'Landlord' to access dashboard)
+      if (dbRole === 'admin') {
+        if (role !== 'landlord') {
+          setMsg('⚠️ This is an Admin account. Please select the "Landlord" button to log in.')
+          setLoading(false)
+          return
+        }
+        // Admin selected Landlord, let them in
+        window.location.href = '/dashboard'
+        return
+      }
+
+      // 2. Strict check for normal users (student/landlord)
+      if (dbRole !== role) {
+        setMsg(`⚠️ This account is registered as a ${dbRole}. Please select the ${dbRole} button to log in.`)
         setLoading(false)
         return
       }
 
-      if (profile?.role === 'student') {
+      // 3. Redirect normal users
+      if (dbRole === 'student') {
         window.location.href = '/browse'
       } else {
         window.location.href = '/dashboard'
@@ -126,12 +141,7 @@ export default function Home() {
               marginBottom: '8px'
             }} 
           />
-          <p style={{ 
-            color: '#6B5B4E', 
-            margin: 0, 
-            fontSize: 13,
-            letterSpacing: '0.5px'
-          }}>
+          <p style={{ color: '#6B5B4E', margin: 0, fontSize: 13, letterSpacing: '0.5px' }}>
             Student Accommodation Platform
           </p>
         </div>
@@ -142,16 +152,9 @@ export default function Home() {
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           style={{ 
-            width: '100%', 
-            padding: '12px 14px', 
-            marginBottom: 12, 
-            boxSizing: 'border-box', 
-            border: '1px solid #DDD0C4', 
-            borderRadius: 8, 
-            fontSize: 16,
-            color: '#000000',
-            background: '#FFFFFF',
-            outline: 'none'
+            width: '100%', padding: '12px 14px', marginBottom: 12, boxSizing: 'border-box', 
+            border: '1px solid #DDD0C4', borderRadius: 8, fontSize: 16,
+            color: '#000000', background: '#FFFFFF', outline: 'none'
           }}
         />
         
@@ -163,33 +166,18 @@ export default function Home() {
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             style={{ 
-              width: '100%', 
-              padding: '12px 45px 12px 14px', 
-              boxSizing: 'border-box', 
-              border: '1px solid #DDD0C4', 
-              borderRadius: 8, 
-              fontSize: 16,
-              color: '#000000',
-              background: '#FFFFFF',
-              outline: 'none'
+              width: '100%', padding: '12px 45px 12px 14px', boxSizing: 'border-box', 
+              border: '1px solid #DDD0C4', borderRadius: 8, fontSize: 16,
+              color: '#000000', background: '#FFFFFF', outline: 'none'
             }}
           />
           <button
             type="button"
             onClick={() => setShowPassword(!showPassword)}
             style={{
-              position: 'absolute',
-              right: '12px',
-              top: '50%',
-              transform: 'translateY(-50%)',
-              background: 'transparent',
-              border: 'none',
-              cursor: 'pointer',
-              fontSize: '20px',
-              padding: '4px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center'
+              position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)',
+              background: 'transparent', border: 'none', cursor: 'pointer',
+              fontSize: '20px', padding: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center'
             }}
             title={showPassword ? 'Hide password' : 'Show password'}
           >
@@ -246,7 +234,7 @@ export default function Home() {
           </button>
         </div>
 
-        {/* Error/Success Message */}
+        {/* Error Message */}
         {msg && (
           <div style={{ padding: 12, background: '#F8D7DA', color: '#721C24', borderRadius: 8, fontSize: 13, textAlign: 'center', marginBottom: 16, border: '1px solid #F5C6CB' }}>
             {msg}
