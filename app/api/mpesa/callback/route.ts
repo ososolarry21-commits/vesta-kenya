@@ -24,26 +24,27 @@ export async function POST(request: Request) {
       
       // Get the listing ID from AccountReference
       const accountReference = metadata.find((item: any) => item.Name === 'AccountReference')?.Value
-      // AccountReference format: "listingId:email"
-      const [listingId, email] = accountReference?.split(':') || []
+      const [listingId] = accountReference?.split(':') || []
 
-      console.log('Payment successful for listing:', listingId)
+      console.log('Payment successful for listing:', listingId, 'Receipt:', mpesaReceipt)
       
       if (listingId) {
-        // Update the specific listing as verified
+        // Mark payment as received but NOT verified yet
+        // Admin will manually verify after physical inspection
         const { error: updateError } = await supabase
           .from('listings')
           .update({ 
-            is_verified: true,
-            verified_at: new Date().toISOString(),
-            verification_receipt: mpesaReceipt
+            verification_payment_received: true,
+            verification_receipt: mpesaReceipt,
+            verification_requested_at: new Date().toISOString(),
+            is_verified: false // Don't auto-verify!
           })
           .eq('id', listingId)
         
         if (updateError) {
-          console.error('Error updating listing verification:', updateError)
+          console.error('Error updating listing:', updateError)
         } else {
-          console.log('✅ Listing verified successfully!')
+          console.log('✅ Payment recorded. Awaiting admin verification.')
         }
       }
     } else {

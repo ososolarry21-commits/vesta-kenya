@@ -171,13 +171,11 @@ export default function Dashboard() {
     }
   }
 
-  // Open payment modal for a specific listing
   function openPaymentModal(listing: any) {
     setSelectedListing(listing)
     setShowPaymentModal(true)
   }
 
-  // M-Pesa Payment Function
   async function handlePayment() {
     if (!phoneNumber || phoneNumber.length < 10) {
       alert('Please enter a valid phone number')
@@ -204,7 +202,7 @@ export default function Dashboard() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           phoneNumber: formattedPhone,
-          amount: 500, // Per property verification
+          amount: 500,
           email: user.email,
           listingId: selectedListing.id,
           listingName: selectedListing.name
@@ -217,6 +215,8 @@ export default function Dashboard() {
         alert('Payment request sent! Check your phone to enter PIN.')
         setShowPaymentModal(false)
         setPhoneNumber('')
+        setSelectedListing(null)
+        await fetchListings(user.id)
       } else {
         alert('Payment failed: ' + (data.errorMessage || 'Unknown error'))
       }
@@ -524,7 +524,12 @@ export default function Dashboard() {
                       ✓ VERIFIED
                     </span>
                   )}
-                  {!listing.is_verified && listing.status === 'approved' && (
+                  {listing.verification_payment_received && !listing.is_verified && (
+                    <span style={{ background: '#E3F2FD', color: '#1976D2', padding: '6px 14px', borderRadius: 6, fontSize: 11, fontWeight: 600 }}>
+                      💰 Payment Received - Awaiting Verification
+                    </span>
+                  )}
+                  {!listing.is_verified && !listing.verification_payment_received && listing.status === 'approved' && (
                     <button 
                       onClick={() => openPaymentModal(listing)}
                       style={{ 

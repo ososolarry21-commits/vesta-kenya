@@ -1,488 +1,364 @@
-'use client';
-import { useEffect, useState } from 'react';
-import { createClient } from '@supabase/supabase-js';
-import { useRouter } from 'next/navigation';
+'use client'
+import { useEffect, useState } from 'react'
+import { createClient } from '@supabase/supabase-js'
+import { useRouter } from 'next/navigation'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL || '',
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
-);
+)
 
 export default function AdminPanel() {
-  const [user, setUser] = useState<any>(null);
-  const [isAdmin, setIsAdmin] = useState(false);
-  const [listings, setListings] = useState<any[]>([]);
-  const [reviews, setReviews] = useState<any[]>([]);
-  const [activeTab, setActiveTab] = useState('pending');
-  const [loading, setLoading] = useState(true);
-  const [respondingId, setRespondingId] = useState<string | null>(null);
-  const [responseText, setResponseText] = useState('');
-  const router = useRouter();
+  const [user, setUser] = useState<any>(null)
+  const [listings, setListings] = useState<any[]>([])
+  const [filter, setFilter] = useState<'all' | 'pending_approval' | 'pending_verification' | 'verified'>('all')
+  const [loading, setLoading] = useState(true)
+  const router = useRouter()
 
   useEffect(() => {
-    checkAdmin();
-  }, []);
+    checkAdmin()
+  }, [])
 
   async function checkAdmin() {
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    const { data: { user } } = await supabase.auth.getUser()
     if (!user) {
-      router.push('/');
-      return;
+      router.push('/')
+      return
     }
-    setUser(user);
 
     const { data: profile } = await supabase
       .from('profiles')
       .select('role')
       .eq('id', user.id)
-      .single();
+      .single()
 
     if (profile?.role !== 'admin') {
-      setIsAdmin(false);
-    } else {
-      setIsAdmin(true);
-      fetchListings();
-      fetchReviews();
+      router.push('/')
+      return
     }
-    setLoading(false);
+
+    setUser(user)
+    await fetchListings()
+    setLoading(false)
   }
 
   async function fetchListings() {
-    const { data } = await supabase
+    let query = supabase
       .from('listings')
-      .select('*')
-      .order('created_at', { ascending: false });
-    if (data) setListings(data);
+      .select(`
+        *,
+        profiles:landlord_id (
+          name,
+          email
+        )
+      `)
+      .order('created_at', { ascending: false })
+
+    const { data, error } = await query
+
+    if (error) {
+      console.error('Error fetching listings:', error)
+    } else {
+      setListings(data || [])
+    }
   }
 
-  async function fetchReviews() {
-    const { data } = await supabase
-      .from('reviews')
-      .select('*, listings(name), profiles(name)')
-      .order('created_at', { ascending: false });
-    if (data) setReviews(data);
+  async function approveListing(listingId: string) {
+    if (!confirm('Approve this listing?')) return
+
+    const { error } = await supabase
+      .from('listings')
+      .update({ status: 'approved' })
+      .eq('id', listingId)
+
+    if (error) {
+      alert('Error approving: ' + error.message)
+    } else {
+      alert('Listing approved!')
+      await fetchListings()
+    }
   }
 
-  async function updateStatus(id: string, newStatus: string) {
-    await supabase.from('listings').update({ status: newStatus }).eq('id', id);
-    fetchListings();
+  async function rejectListing(listingId: string) {
+    if (!confirm('Reject this listing?')) return
+
+    const { error } = await supabase
+      .from('listings')
+      .update({ status: 'rejected' })
+      .eq('id', listingId)
+
+    if (error) {
+      alert('Error rejecting: ' + error.message)
+    } else {
+      alert('Listing rejected')
+      await fetchListings()
+    }
   }
 
-  async function submitResponse(reviewId: string) {
-    await supabase
-      .from('reviews')
-      .update({ admin_response: responseText })
-      .eq('id', reviewId);
-    setRespondingId(null);
-    setResponseText('');
-    fetchReviews();
+  async function approveVerification(listingId: string) {
+    if (!confirm('Mark this property as VERIFIED?')) return
+
+    const { error } = await supabase
+      .from('listings')
+      .update({ 
+        is_verified: true,
+        verified_at: new Date().toISOString()
+      })
+      .eq('id', listingId)
+
+    if (error) {
+      alert('Error: ' + error.message)
+    } else {
+      alert('Property verified successfully!')
+      await fetchListings()
+    }
   }
 
-  if (loading) return <div style={{ padding: 40 }}>Loading admin panel...</div>;
+  async function deleteListing(listingId: string) {
+    if (!confirm('Delete this listing permanently?')) return
 
-  if (!isAdmin) {
+    const { error } = await supabase
+      .from('listings')
+      .delete()
+      .eq('id', listingId)
+
+    if (error) {
+      alert('Error deleting: ' + error.message)
+    } else {
+      alert('Listing deleted')
+      await fetchListings()
+    }
+  }
+
+  const filteredListings = listings.filter(listing => {
+    if (filter === 'all') return true
+    if (filter === 'pending_approval') return listing.status === 'pending'
+    if (filter === 'pending_verification') return listing.verification_payment_received && !listing.is_verified
+    if (filter === 'verified') return listing.is_verified
+    return true
+  })
+
+  const stats = {
+    total: listings.length,
+    pending: listings.filter(l => l.status === 'pending').length,
+    awaitingVerification: listings.filter(l => l.verification_payment_received && !l.is_verified).length,
+    verified: listings.filter(l => l.is_verified).length
+  }
+
+  if (loading) {
     return (
-      <div
-        style={{
-          minHeight: '100vh',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          background: '#FDF8F3',
-        }}
-      >
-        <div
-          style={{
-            textAlign: 'center',
-            background: 'white',
-            padding: 40,
-            borderRadius: 16,
-          }}
-        >
-          <h2> Access Denied</h2>
-          <button
-            onClick={() => router.push('/dashboard')}
-            style={{
-              padding: '10px 20px',
-              background: '#D4873A',
-              color: 'white',
-              border: 'none',
-              borderRadius: 8,
-            }}
-          >
-            Go to Dashboard
-          </button>
-        </div>
+      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <div>Loading...</div>
       </div>
-    );
+    )
   }
-
-  const filteredListings = listings.filter((l) => l.status === activeTab);
 
   return (
-    <div
-      style={{
-        minHeight: '100vh',
-        background: '#FDF8F3',
-        fontFamily:
-          "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
-      }}
-    >
-      {/* Header */}
-      <nav
-        style={{
-          background: '#1C1209',
-          padding: '16px 20px',
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          color: 'white',
-        }}
-      >
-        <div
-          style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }}
-          onClick={() => router.push('/')}
-        >
-          <img
-            src="/logo.png"
-            alt="Vesta"
-            style={{
-              height: '40px',
-              width: 'auto',
-              filter: 'brightness(0) invert(1)',
-            }}
-          />
-        </div>
-        <button
+    <div style={{ minHeight: '100vh', background: '#F5F5F5', fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" }}>
+      <nav style={{ 
+        background: 'white', 
+        padding: '16px 60px', 
+        display: 'flex', 
+        justifyContent: 'space-between', 
+        alignItems: 'center', 
+        boxShadow: '0 2px 20px rgba(0,0,0,0.05)' 
+      }}>
+        <h1 style={{ margin: 0, fontSize: 24, color: '#1C1209' }}>️ Admin Panel</h1>
+        <button 
           onClick={() => router.push('/dashboard')}
-          style={{
-            padding: '8px 16px',
-            background: 'transparent',
-            border: '1px solid #D4873A',
-            color: '#D4873A',
-            borderRadius: 8,
-            cursor: 'pointer',
-          }}
+          style={{ padding: '10px 20px', background: '#1C1209', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer' }}
         >
           Back to Dashboard
         </button>
       </nav>
 
-      <div style={{ padding: '20px', maxWidth: 1200, margin: '0 auto' }}>
-        <h1
-          style={{
-            fontSize: 28,
-            fontWeight: 700,
-            color: '#1C1209',
-            marginBottom: 20,
-          }}
-        >
-          Admin Moderation
-        </h1>
-
-        {/* Tabs */}
-        <div
-          style={{
-            display: 'flex',
-            gap: 8,
-            marginBottom: 20,
-            overflowX: 'auto',
-            paddingBottom: 8,
-          }}
-        >
-          {['pending', 'approved', 'rejected', 'reviews'].map((tab) => (
-            <button
-              key={tab}
-              onClick={() => setActiveTab(tab)}
-              style={{
-                padding: '10px 20px',
-                background: activeTab === tab ? '#D4873A' : 'white',
-                color: activeTab === tab ? 'white' : '#1C1209',
-                border: 'none',
-                borderRadius: 8,
-                cursor: 'pointer',
-                fontWeight: 600,
-                textTransform: 'capitalize',
-                whiteSpace: 'nowrap',
-              }}
-            >
-              {tab}{' '}
-              {tab === 'reviews'
-                ? `(${reviews.length})`
-                : `(${listings.filter((l) => l.status === tab).length})`}
-            </button>
-          ))}
+      <div style={{ padding: '40px 60px', maxWidth: 1400, margin: '0 auto' }}>
+        {/* Stats */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 20, marginBottom: 30 }}>
+          <div style={{ background: 'white', padding: 24, borderRadius: 12, boxShadow: '0 2px 12px rgba(0,0,0,0.06)' }}>
+            <div style={{ fontSize: 32, fontWeight: 800, color: '#1C1209' }}>{stats.total}</div>
+            <div style={{ color: '#6B5B4E', fontSize: 13 }}>Total Listings</div>
+          </div>
+          <div style={{ background: 'white', padding: 24, borderRadius: 12, boxShadow: '0 2px 12px rgba(0,0,0,0.06)' }}>
+            <div style={{ fontSize: 32, fontWeight: 800, color: '#FF9800' }}>{stats.pending}</div>
+            <div style={{ color: '#6B5B4E', fontSize: 13 }}>Pending Approval</div>
+          </div>
+          <div style={{ background: 'white', padding: 24, borderRadius: 12, boxShadow: '0 2px 12px rgba(0,0,0,0.06)' }}>
+            <div style={{ fontSize: 32, fontWeight: 800, color: '#2196F3' }}>{stats.awaitingVerification}</div>
+            <div style={{ color: '#6B5B4E', fontSize: 13 }}>Awaiting Verification</div>
+          </div>
+          <div style={{ background: 'white', padding: 24, borderRadius: 12, boxShadow: '0 2px 12px rgba(0,0,0,0.06)' }}>
+            <div style={{ fontSize: 32, fontWeight: 800, color: '#4CAF50' }}>{stats.verified}</div>
+            <div style={{ color: '#6B5B4E', fontSize: 13 }}>Verified Properties</div>
+          </div>
         </div>
 
-        {/* REVIEWS TAB CONTENT */}
-        {activeTab === 'reviews' && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-            {reviews.length === 0 ? (
-              <div
-                style={{
-                  textAlign: 'center',
-                  padding: 40,
-                  background: 'white',
-                  borderRadius: 12,
-                }}
-              >
-                No reviews yet.
-              </div>
-            ) : (
-              reviews.map((review) => (
-                <div
-                  key={review.id}
-                  style={{
-                    background: 'white',
-                    padding: 20,
-                    borderRadius: 12,
-                    boxShadow: '0 2px 10px rgba(0,0,0,0.05)',
-                  }}
-                >
-                  <div
-                    style={{
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      marginBottom: 8,
-                    }}
-                  >
-                    <div>
-                      <strong>{review.profiles?.name}</strong> reviewed{' '}
-                      <strong>{review.listings?.name}</strong>
-                      <span style={{ color: '#FFD700', marginLeft: 8 }}>
-                        {'★'.repeat(review.rating)}
-                      </span>
-                    </div>
-                    <span style={{ fontSize: 12, color: '#666' }}>
-                      {new Date(review.created_at).toLocaleDateString()}
-                    </span>
-                  </div>
-                  <p style={{ margin: '0 0 12px 0', color: '#333' }}>
-                    {review.comment}
-                  </p>
+        {/* Filter Tabs */}
+        <div style={{ display: 'flex', gap: 12, marginBottom: 24, flexWrap: 'wrap' }}>
+          <button 
+            onClick={() => setFilter('all')}
+            style={{ 
+              padding: '10px 20px', 
+              background: filter === 'all' ? '#1C1209' : 'white', 
+              color: filter === 'all' ? 'white' : '#1C1209',
+              border: 'none', 
+              borderRadius: 8, 
+              cursor: 'pointer',
+              fontWeight: 600
+            }}
+          >
+            All Listings
+          </button>
+          <button 
+            onClick={() => setFilter('pending_approval')}
+            style={{ 
+              padding: '10px 20px', 
+              background: filter === 'pending_approval' ? '#FF9800' : 'white', 
+              color: filter === 'pending_approval' ? 'white' : '#1C1209',
+              border: 'none', 
+              borderRadius: 8, 
+              cursor: 'pointer',
+              fontWeight: 600
+            }}
+          >
+            Pending Approval ({stats.pending})
+          </button>
+          <button 
+            onClick={() => setFilter('pending_verification')}
+            style={{ 
+              padding: '10px 20px', 
+              background: filter === 'pending_verification' ? '#2196F3' : 'white', 
+              color: filter === 'pending_verification' ? 'white' : '#1C1209',
+              border: 'none', 
+              borderRadius: 8, 
+              cursor: 'pointer',
+              fontWeight: 600
+            }}
+          >
+            Awaiting Verification ({stats.awaitingVerification})
+          </button>
+          <button 
+            onClick={() => setFilter('verified')}
+            style={{ 
+              padding: '10px 20px', 
+              background: filter === 'verified' ? '#4CAF50' : 'white', 
+              color: filter === 'verified' ? 'white' : '#1C1209',
+              border: 'none', 
+              borderRadius: 8, 
+              cursor: 'pointer',
+              fontWeight: 600
+            }}
+          >
+            Verified ({stats.verified})
+          </button>
+        </div>
 
-                  {review.admin_response ? (
-                    <div
-                      style={{
-                        background: '#F0F7FF',
-                        padding: 12,
-                        borderRadius: 8,
-                        borderLeft: '4px solid #007BFF',
-                      }}
-                    >
-                      <strong style={{ color: '#007BFF', fontSize: 13 }}>
-                        Admin Response:
-                      </strong>
-                      <p style={{ margin: '4px 0 0 0', fontSize: 14 }}>
-                        {review.admin_response}
-                      </p>
+        {/* Listings */}
+        {filteredListings.length === 0 ? (
+          <div style={{ textAlign: 'center', padding: 60, background: 'white', borderRadius: 12 }}>
+            <div style={{ fontSize: 48, marginBottom: 16 }}>📭</div>
+            <p style={{ color: '#6B5B4E' }}>No listings found</p>
+          </div>
+        ) : (
+          <div style={{ display: 'grid', gap: 16 }}>
+            {filteredListings.map((listing) => (
+              <div key={listing.id} style={{ 
+                background: 'white', 
+                padding: 24, 
+                borderRadius: 12, 
+                boxShadow: '0 2px 12px rgba(0,0,0,0.06)' 
+              }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', gap: 20, flexWrap: 'wrap' }}>
+                  <div style={{ flex: 1, minWidth: 300 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8 }}>
+                      <h3 style={{ margin: 0, color: '#1C1209' }}>{listing.name}</h3>
+                      {listing.is_verified && (
+                        <span style={{ background: 'linear-gradient(135deg, #007BFF, #0056b3)', color: 'white', padding: '4px 12px', borderRadius: 6, fontSize: 11, fontWeight: 700 }}>
+                          ✓ VERIFIED
+                        </span>
+                      )}
+                      {listing.verification_payment_received && !listing.is_verified && (
+                        <span style={{ background: '#2196F3', color: 'white', padding: '4px 12px', borderRadius: 6, fontSize: 11, fontWeight: 600 }}>
+                          💰 Payment Received
+                        </span>
+                      )}
                     </div>
-                  ) : respondingId === review.id ? (
-                    <div style={{ display: 'flex', gap: 8 }}>
-                      <input
-                        value={responseText}
-                        onChange={(e) => setResponseText(e.target.value)}
-                        placeholder="Type your response..."
-                        style={{
-                          flex: 1,
-                          padding: 10,
-                          border: '1px solid #DDD0C4',
-                          borderRadius: 6,
-                        }}
-                      />
-                      <button
-                        onClick={() => submitResponse(review.id)}
-                        style={{
-                          padding: '10px 16px',
-                          background: '#007BFF',
-                          color: 'white',
-                          border: 'none',
-                          borderRadius: 6,
-                          cursor: 'pointer',
+                    <p style={{ margin: '4px 0', color: '#6B5B4E', fontSize: 14 }}>
+                      📍 {listing.area}, {listing.city}
+                    </p>
+                    <p style={{ margin: '4px 0', color: '#6B5B4E', fontSize: 14 }}>
+                      👤 {listing.profiles?.name || 'Unknown'} ({listing.profiles?.email || 'No email'})
+                    </p>
+                    <p style={{ margin: '4px 0', color: '#D4873A', fontSize: 14, fontWeight: 600 }}>
+                      KSh {listing.price?.toLocaleString()}/month
+                    </p>
+                    <div style={{ marginTop: 12, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                      <span style={{ 
+                        padding: '4px 10px', 
+                        borderRadius: 6, 
+                        fontSize: 12, 
+                        fontWeight: 600,
+                        background: listing.status === 'approved' ? '#D4EDDA' : listing.status === 'pending' ? '#FFF3CD' : '#F8D7DA',
+                        color: listing.status === 'approved' ? '#155724' : listing.status === 'pending' ? '#856404' : '#721C24'
+                      }}>
+                        {listing.status === 'approved' ? 'Approved' : listing.status === 'pending' ? 'Pending Approval' : 'Rejected'}
+                      </span>
+                      {listing.verification_receipt && (
+                        <span style={{ background: '#E3F2FD', color: '#1976D2', padding: '4px 10px', borderRadius: 6, fontSize: 11 }}>
+                          Receipt: {listing.verification_receipt}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                    {listing.status === 'pending' && (
+                      <>
+                        <button 
+                          onClick={() => approveListing(listing.id)}
+                          style={{ padding: '8px 16px', background: '#4CAF50', color: 'white', border: 'none', borderRadius: 6, cursor: 'pointer', fontWeight: 600 }}
+                        >
+                          ✓ Approve
+                        </button>
+                        <button 
+                          onClick={() => rejectListing(listing.id)}
+                          style={{ padding: '8px 16px', background: '#F44336', color: 'white', border: 'none', borderRadius: 6, cursor: 'pointer', fontWeight: 600 }}
+                        >
+                          ✗ Reject
+                        </button>
+                      </>
+                    )}
+                    
+                    {listing.verification_payment_received && !listing.is_verified && (
+                      <button 
+                        onClick={() => approveVerification(listing.id)}
+                        style={{ 
+                          padding: '8px 16px', 
+                          background: 'linear-gradient(135deg, #007BFF, #0056b3)', 
+                          color: 'white', 
+                          border: 'none', 
+                          borderRadius: 6, 
+                          cursor: 'pointer', 
+                          fontWeight: 700 
                         }}
                       >
-                        Send
+                        ✓ Mark as Verified
                       </button>
-                      <button
-                        onClick={() => setRespondingId(null)}
-                        style={{
-                          padding: '10px 16px',
-                          background: '#eee',
-                          color: '#333',
-                          border: 'none',
-                          borderRadius: 6,
-                          cursor: 'pointer',
-                        }}
-                      >
-                        Cancel
-                      </button>
-                    </div>
-                  ) : (
-                    <button
-                      onClick={() => setRespondingId(review.id)}
-                      style={{
-                        padding: '8px 16px',
-                        background: '#007BFF',
-                        color: 'white',
-                        border: 'none',
-                        borderRadius: 6,
-                        cursor: 'pointer',
-                        fontSize: 13,
-                      }}
+                    )}
+                    
+                    <button 
+                      onClick={() => deleteListing(listing.id)}
+                      style={{ padding: '8px 16px', background: '#F8D7DA', color: '#721C24', border: 'none', borderRadius: 6, cursor: 'pointer', fontWeight: 600 }}
                     >
-                      Respond to Review
+                      🗑️ Delete
                     </button>
-                  )}
+                  </div>
                 </div>
-              ))
-            )}
+              </div>
+            ))}
           </div>
         )}
-
-        {/* LISTINGS TAB CONTENT */}
-        {activeTab !== 'reviews' &&
-          (filteredListings.length === 0 ? (
-            <div
-              style={{
-                textAlign: 'center',
-                padding: 40,
-                background: 'white',
-                borderRadius: 12,
-              }}
-            >
-              No {activeTab} listings found.
-            </div>
-          ) : (
-            <div style={{ display: 'grid', gap: 16 }}>
-              {filteredListings.map((listing) => (
-                <div
-                  key={listing.id}
-                  style={{
-                    background: 'white',
-                    padding: 20,
-                    borderRadius: 12,
-                    boxShadow: '0 2px 10px rgba(0,0,0,0.05)',
-                    display: 'flex',
-                    gap: 20,
-                    alignItems: 'center',
-                    flexWrap: 'wrap',
-                  }}
-                >
-                  <div
-                    style={{
-                      width: 100,
-                      height: 100,
-                      borderRadius: 8,
-                      flexShrink: 0,
-                      background: listing.images?.[0]
-                        ? `url("${listing.images[0]}") center/cover`
-                        : '#eee',
-                    }}
-                  />
-                  <div style={{ flex: 1, minWidth: 200 }}>
-                    <h3 style={{ margin: '0 0 4px 0', fontSize: 18 }}>
-                      {listing.name}
-                    </h3>
-                    <p style={{ margin: 0, color: '#666', fontSize: 14 }}>
-                      📍 {listing.area} • KSh {listing.price?.toLocaleString()}
-                    </p>
-                  </div>
-                  <div
-                    style={{ display: 'flex', flexDirection: 'column', gap: 8 }}
-                  >
-                    {activeTab === 'pending' && (
-                      <>
-                        <button
-                          onClick={() => updateStatus(listing.id, 'approved')}
-                          style={{
-                            padding: '8px 16px',
-                            background: '#2A7A5A',
-                            color: 'white',
-                            border: 'none',
-                            borderRadius: 6,
-                            cursor: 'pointer',
-                          }}
-                        >
-                          Approve
-                        </button>
-                        <button
-                          onClick={() => updateStatus(listing.id, 'rejected')}
-                          style={{
-                            padding: '8px 16px',
-                            background: '#DC3545',
-                            color: 'white',
-                            border: 'none',
-                            borderRadius: 6,
-                            cursor: 'pointer',
-                          }}
-                        >
-                          Reject
-                        </button>
-                      </>
-                    )}
-                    {activeTab === 'approved' && (
-                      <>
-                        <button
-                          onClick={async () => {
-                            await supabase
-                              .from('listings')
-                              .update({ is_verified: !listing.is_verified })
-                              .eq('id', listing.id);
-                            fetchListings();
-                          }}
-                          style={{
-                            padding: '8px 16px',
-                            background: listing.is_verified
-                              ? '#FFC107'
-                              : '#007BFF',
-                            color: listing.is_verified ? '#000' : 'white',
-                            border: 'none',
-                            borderRadius: 6,
-                            cursor: 'pointer',
-                          }}
-                        >
-                          {listing.is_verified
-                            ? '★ Remove Verification'
-                            : '★ Mark Verified'}
-                        </button>
-                        <button
-                          onClick={() => updateStatus(listing.id, 'pending')}
-                          style={{
-                            padding: '8px 16px',
-                            background: '#F0EAE3',
-                            color: '#1C1209',
-                            border: 'none',
-                            borderRadius: 6,
-                            cursor: 'pointer',
-                          }}
-                        >
-                          Revert
-                        </button>
-                      </>
-                    )}
-                    {activeTab === 'rejected' && (
-                      <button
-                        onClick={() => updateStatus(listing.id, 'approved')}
-                        style={{
-                          padding: '8px 16px',
-                          background: '#2A7A5A',
-                          color: 'white',
-                          border: 'none',
-                          borderRadius: 6,
-                          cursor: 'pointer',
-                        }}
-                      >
-                        Approve Anyway
-                      </button>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-          ))}
       </div>
     </div>
-  );
+  )
 }
