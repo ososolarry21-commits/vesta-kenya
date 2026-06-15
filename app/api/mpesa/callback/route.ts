@@ -3,7 +3,8 @@ import { createClient } from '@supabase/supabase-js'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL || '',
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
+  // WE USE THE SERVICE ROLE KEY HERE TO BYPASS SECURITY
+  process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
 )
 
 export async function POST(request: Request) {
@@ -19,32 +20,28 @@ export async function POST(request: Request) {
       const metadata = Body.stkCallback.CallbackMetadata.Item
       
       const mpesaReceipt = metadata.find((item: any) => item.Name === 'MpesaReceiptNumber')?.Value
-      const amount = metadata.find((item: any) => item.Name === 'Amount')?.Value
-      const phoneNumber = metadata.find((item: any) => item.Name === 'PhoneNumber')?.Value
-      
-      // Get the listing ID from AccountReference
       const accountReference = metadata.find((item: any) => item.Name === 'AccountReference')?.Value
       const [listingId] = accountReference?.split(':') || []
 
-      console.log('Payment successful for listing:', listingId, 'Receipt:', mpesaReceipt)
+      console.log('Payment successful for listing:', listingId)
       
       if (listingId) {
-        // Mark payment as received but NOT verified yet
-        // Admin will manually verify after physical inspection
-        const { error: updateError } = await supabase
+        // This will now work because we are using the Service Role Key
+        const { data, error } = await supabase
           .from('listings')
           .update({ 
             verification_payment_received: true,
             verification_receipt: mpesaReceipt,
             verification_requested_at: new Date().toISOString(),
-            is_verified: false // Don't auto-verify!
+            is_verified: false 
           })
           .eq('id', listingId)
+          .select()
         
-        if (updateError) {
-          console.error('Error updating listing:', updateError)
+        if (error) {
+          console.error('Error updating listing:', error)
         } else {
-          console.log('✅ Payment recorded. Awaiting admin verification.')
+          console.log('✅ Database updated successfully!', data)
         }
       }
     } else {
