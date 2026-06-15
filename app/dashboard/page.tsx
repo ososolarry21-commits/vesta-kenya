@@ -596,14 +596,9 @@ export default function Dashboard() {
             width: '90%',
             boxShadow: '0 20px 60px rgba(0,0,0,0.3)'
           }}>
-            <h2 style={{ margin: '0 0 16px 0', color: '#1C1209', textAlign: 'center', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              {/* Official M-Pesa Logo */}
-              <img 
-                src="/mpesa-logo.png"
-                alt="M-Pesa"
-                style={{ height: '50px', width: 'auto', objectFit: 'contain' }}
-              />
-            </h2>
+           <h2 style={{ margin: '0 0 16px 0', color: '#00C35D', textAlign: 'center', fontSize: 28, fontWeight: 'bold' }}>
+  💚 Pay with M-Pesa
+</h2>
             <p style={{ color: '#6B5B4E', textAlign: 'center', marginBottom: 24, fontSize: 15 }}>
               Pay KSh 1,000 to get your verified badge
             </p>
