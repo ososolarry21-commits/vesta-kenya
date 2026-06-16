@@ -21,22 +21,25 @@ export default function AdminPanel() {
 
   async function checkAdmin() {
     const { data: { user } } = await supabase.auth.getUser()
+    
     if (!user) {
       router.push('/')
       return
     }
-
+  
     const { data: profile } = await supabase
       .from('profiles')
       .select('role')
       .eq('id', user.id)
       .single()
-
+  
     if (profile?.role !== 'admin') {
+      // Sign out and redirect if not admin
+      await supabase.auth.signOut()
       router.push('/')
       return
     }
-
+  
     setUser(user)
     await fetchListings()
     setLoading(false)

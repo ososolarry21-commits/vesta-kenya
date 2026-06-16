@@ -58,52 +58,61 @@ export default function Home() {
     setLoading(true)
     setMsg('')
     
-    const { data, error } = await supabase.auth.signInWithPassword({ email, password })
-    
-    if (error) {
-      setMsg(error.message)
-      setLoading(false)
-      return
-    }
-
-    if (data.user) {
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('role')
-        .eq('id', data.user.id)
-        .single()
-
-      const dbRole = profile?.role || 'student'
-
-      // 1. Handle Admin Accounts (Must select 'Landlord' to access dashboard)
-      if (dbRole === 'admin') {
-        if (role !== 'landlord') {
-          setMsg('⚠️ This is an Admin account. Please select the "Landlord" button to log in.')
-          setLoading(false)
-          return
-        }
-        // Admin selected Landlord, let them in
-        window.location.href = '/dashboard'
-        return
-      }
-
-      // 2. Strict check for normal users (student/landlord)
-      if (dbRole !== role) {
-        setMsg(`⚠️ This account is registered as a ${dbRole}. Please select the ${dbRole} button to log in.`)
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({ 
+        email, 
+        password 
+      })
+      
+      if (error) {
+        setMsg(error.message)
         setLoading(false)
         return
       }
-
-      // 3. Redirect normal users
-      if (dbRole === 'student') {
-        window.location.href = '/browse'
-      } else {
-        window.location.href = '/dashboard'
+  
+      if (data.user) {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('role')
+          .eq('id', data.user.id)
+          .single()
+  
+        const dbRole = profile?.role || 'student'
+  
+        // Handle Admin accounts
+        if (dbRole === 'admin') {
+          if (role !== 'landlord') {
+            setMsg('⚠️ Admin account detected. Please select "Landlord" button to log in.')
+            await supabase.auth.signOut()
+            setLoading(false)
+            return
+          }
+          // Force redirect to dashboard for admin
+          window.location.href = '/dashboard'
+          return
+        }
+  
+        // Handle role mismatch
+        if (dbRole !== role) {
+          setMsg(`⚠️ This account is registered as ${dbRole}. Select ${dbRole} button.`)
+          await supabase.auth.signOut()
+          setLoading(false)
+          return
+        }
+  
+        // Redirect based on role
+        if (dbRole === 'student') {
+          window.location.href = '/browse'
+        } else {
+          window.location.href = '/dashboard'
+        }
       }
+    } catch (err) {
+      setMsg('An error occurred during login')
     }
     setLoading(false)
   }
-
+  
   return (
     <div style={{ 
       minHeight: '100vh',

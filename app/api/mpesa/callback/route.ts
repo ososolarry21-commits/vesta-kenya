@@ -6,7 +6,7 @@ export async function POST(request: Request) {
     const body = await request.json()
     const { Body } = body
     
-    console.log('📥 M-Pesa Callback received')
+    console.log('📥 Callback received:', JSON.stringify(Body, null, 2))
     
     const resultCode = Body.stkCallback.ResultCode
     
@@ -15,12 +15,15 @@ export async function POST(request: Request) {
       
       const mpesaReceipt = metadata.find((item: any) => item.Name === 'MpesaReceiptNumber')?.Value
       const accountReference = metadata.find((item: any) => item.Name === 'AccountReference')?.Value
+      
+      console.log('AccountReference:', accountReference)
+      
+      // Extract listingId from "listingId:email" format
       const [listingId] = accountReference?.split(':') || []
-
-      console.log('✅ Payment successful for listing:', listingId)
+      
+      console.log('✅ Payment successful! Listing ID:', listingId, 'Receipt:', mpesaReceipt)
       
       if (listingId) {
-        // Use SERVICE ROLE KEY to bypass RLS
         const supabase = createClient(
           process.env.NEXT_PUBLIC_SUPABASE_URL || '',
           process.env.SUPABASE_SERVICE_ROLE_KEY || ''
@@ -34,11 +37,12 @@ export async function POST(request: Request) {
             verification_requested_at: new Date().toISOString()
           })
           .eq('id', listingId)
+          .select()
         
         if (error) {
-          console.error('❌ Database update failed:', error)
+          console.error('❌ Database error:', error)
         } else {
-          console.log('✅ Database updated successfully!')
+          console.log('✅ Database updated:', data)
         }
       }
     } else {

@@ -45,10 +45,26 @@ export default function Dashboard() {
 
   async function checkUser() {
     const { data: { user } } = await supabase.auth.getUser()
-    if (!user) { router.push('/'); return }
+    
+    if (!user) {
+      router.push('/')
+      return
+    }
+  
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', user.id)
+      .single()
+  
+    // Block students from accessing landlord dashboard
+    if (profile?.role === 'student') {
+      router.push('/browse')
+      return
+    }
+  
     setUser(user)
-    const { data: profileData } = await supabase.from('profiles').select('*').eq('id', user.id).single()
-    setProfile(profileData)
+    setProfile(profile)
     await fetchListings(user.id)
     setLoading(false)
   }
