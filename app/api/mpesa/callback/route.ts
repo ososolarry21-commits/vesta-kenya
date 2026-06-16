@@ -1,20 +1,14 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL || '',
-  // WE USE THE SERVICE ROLE KEY HERE TO BYPASS SECURITY
-  process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
-)
-
 export async function POST(request: Request) {
   try {
     const body = await request.json()
     const { Body } = body
     
-    const resultCode = Body.stkCallback.ResultCode
+    console.log('📥 M-Pesa Callback received')
     
-    console.log('M-Pesa Callback received:', { resultCode })
+    const resultCode = Body.stkCallback.ResultCode
     
     if (resultCode === 0) {
       const metadata = Body.stkCallback.CallbackMetadata.Item
@@ -23,34 +17,37 @@ export async function POST(request: Request) {
       const accountReference = metadata.find((item: any) => item.Name === 'AccountReference')?.Value
       const [listingId] = accountReference?.split(':') || []
 
-      console.log('Payment successful for listing:', listingId)
+      console.log('✅ Payment successful for listing:', listingId)
       
       if (listingId) {
-        // This will now work because we are using the Service Role Key
+        // Use SERVICE ROLE KEY to bypass RLS
+        const supabase = createClient(
+          process.env.NEXT_PUBLIC_SUPABASE_URL || '',
+          process.env.SUPABASE_SERVICE_ROLE_KEY || ''
+        )
+        
         const { data, error } = await supabase
           .from('listings')
           .update({ 
             verification_payment_received: true,
             verification_receipt: mpesaReceipt,
-            verification_requested_at: new Date().toISOString(),
-            is_verified: false 
+            verification_requested_at: new Date().toISOString()
           })
           .eq('id', listingId)
-          .select()
         
         if (error) {
-          console.error('Error updating listing:', error)
+          console.error('❌ Database update failed:', error)
         } else {
-          console.log('✅ Database updated successfully!', data)
+          console.log('✅ Database updated successfully!')
         }
       }
     } else {
-      console.log('Payment failed or cancelled:', Body.stkCallback.ResultDesc)
+      console.log('❌ Payment failed:', Body.stkCallback.ResultDesc)
     }
     
     return NextResponse.json({ result: 'success' })
   } catch (error) {
-    console.error('Callback Error:', error)
+    console.error('💥 Callback error:', error)
     return NextResponse.json({ error: 'Callback failed' }, { status: 500 })
   }
 }
