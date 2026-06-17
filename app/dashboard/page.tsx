@@ -335,6 +335,26 @@ export default function Dashboard() {
                   {!listing.is_verified && !listing.verification_payment_received && listing.status === 'approved' && (
                     <button onClick={() => openPaymentModal(listing)} style={{ padding: '8px 16px', background: '#00C35D', color: 'white', border: 'none', borderRadius: 6, cursor: 'pointer', fontWeight: 600, fontSize: 12 }}>Verify - KSh 500</button>
                   )}
+                                    {listing.checkout_request_id && !listing.is_verified && !listing.verification_payment_received && (
+                    <button 
+                      onClick={async () => {
+                        const res = await fetch('/api/mpesa/query', {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ 
+                            checkoutRequestId: listing.checkout_request_id, 
+                            listingId: listing.id 
+                          })
+                        })
+                        const data = await res.json()
+                        alert(data.message)
+                        if (data.success) await fetchListings(user.id)
+                      }}
+                      style={{ padding: '8px 16px', background: '#FF9800', color: 'white', border: 'none', borderRadius: 6, cursor: 'pointer', fontWeight: 600, fontSize: 12 }}
+                    >
+                      Check Payment Status
+                    </button>
+                  )}
                   <button onClick={() => deleteListing(listing.id)} style={{ padding: '8px 16px', background: '#F8D7DA', color: '#721C24', border: 'none', borderRadius: 6, cursor: 'pointer', fontWeight: 600 }}>Delete</button>
                 </div>
               </div>

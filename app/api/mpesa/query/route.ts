@@ -7,11 +7,7 @@ const SHORTCODE = process.env.MPESA_SHORTCODE || '174379'
 const PASSKEY = process.env.MPESA_PASSKEY || ''
 const ENVIRONMENT = process.env.MPESA_ENVIRONMENT || 'sandbox'
 
-const BASE_URL = ENVIRONMENT === 'production' 
-  ? 'https://api.safaricom.co.ke' 
-  : 'https://sandbox.safaricom.co.ke'
-
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://vesta-kenya.vercel.app'
+const BASE_URL = ENVIRONMENT === 'production' ? 'https://api.safaricom.co.ke' : 'https://sandbox.safaricom.co.ke'
 
 async function getAccessToken() {
   const auth = Buffer.from(`${CONSUMER_KEY}:${CONSUMER_SECRET}`).toString('base64')
@@ -24,18 +20,13 @@ async function getAccessToken() {
 
 export async function POST(request: Request) {
   try {
-    const { phoneNumber, amount, email, listingId, listingName } = await request.json()
+    const { checkoutRequestId, listingId } = await request.json()
     
     const accessToken = await getAccessToken()
     const timestamp = new Date().toISOString().replace(/[^0-9]/g, '').slice(0, -3)
     const password = Buffer.from(`${SHORTCODE}${PASSKEY}${timestamp}`).toString('base64')
     
-    const callBackURL = `${APP_URL}/api/mpesa/callback`
-    
-    // Use listingId:email as reference to track which property is being verified
-    const accountReference = `${listingId}:${email}`
-
-    const response = await fetch(`${BASE_URL}/mpesa/stkpush/v1/processrequest`, {
+    const response = await fetch(`${BASE_URL}/mpesa/stkpushquery/v1/query`, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${accessToken}`,
@@ -45,34 +36,33 @@ export async function POST(request: Request) {
         BusinessShortCode: SHORTCODE,
         Password: password,
         Timestamp: timestamp,
-        TransactionType: 'CustomerPayBillOnline',
-        Amount: amount,
-        PartyA: phoneNumber,
-        PartyB: SHORTCODE,
-        PhoneNumber: phoneNumber,
-        CallBackURL: callBackURL,
-        AccountReference: accountReference,
-        TransactionDesc: `Verify Property: ${listingName}`
+        CheckoutRequestID: checkoutRequestId
       })
     })
     
     const data = await response.json()
     
-    // SAVE THE CHECKOUT REQUEST ID TO THE DATABASE
-    if (data.ResponseCode === '0' && data.CheckoutRequestID) {
+    // If Safaricom says the payment was successful, update our database
+    if (data.ResultCode === '0') {
       const supabase = createClient(
         process.env.NEXT_PUBLIC_SUPABASE_URL || '',
         process.env.SUPABASE_SERVICE_ROLE_KEY || ''
       )
+      
       await supabase
         .from('listings')
-        .update({ checkout_request_id: data.CheckoutRequestID })
+        .update({ 
+          verification_payment_received: true,
+          verification_receipt: 'Confirmed via Status Check',
+          verification_requested_at: new Date().toISOString()
+        })
         .eq('id', listingId)
+        
+      return NextResponse.json({ success: true, message: 'Payment confirmed and database updated!' })
     }
-
-    return NextResponse.json(data)
+    
+    return NextResponse.json({ success: false, message: data.ResultDesc || 'Payment not found or pending.' })
   } catch (error) {
-    console.error('M-Pesa Error:', error)
-    return NextResponse.json({ error: 'Failed to initiate payment' }, { status: 500 })
+    return NextResponse.json({ error: 'Failed to check status' }, { status: 500 })
   }
 }
