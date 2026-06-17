@@ -100,13 +100,15 @@ export default function Home() {
           return
         }
   
-        // Redirect based on role
-        if (dbRole === 'student') {
-          window.location.href = '/browse'
-        } else {
-          window.location.href = '/dashboard'
-        }
-      }
+       // Redirect based on role
+    if (dbRole === 'student') {
+      window.location.href = '/browse'
+    } else if (dbRole === 'agent') {
+      window.location.href = '/agent'
+    } else {
+      window.location.href = '/dashboard'
+    }
+
     } catch (err) {
       setMsg('An error occurred during login')
     }
@@ -222,6 +224,26 @@ export default function Home() {
             >
               🏠 Landlord
             </button>
+            {/* Add this Agent button next to Student and Landlord */}
+<button
+  onClick={() => setRole('agent')}
+  style={{
+    padding: '12px 24px',
+    background: role === 'agent' ? '#2196F3' : 'white',
+    color: role === 'agent' ? 'white' : '#333',
+    border: '2px solid #DDD0C4',
+    borderRadius: 8,
+    cursor: 'pointer',
+    fontWeight: 600,
+    fontSize: 14,
+    display: 'flex',
+    alignItems: 'center',
+    gap: 8,
+    transition: 'all 0.3s'
+  }}
+>
+  👷 Agent
+</button>
           </div>
         </div>
         
