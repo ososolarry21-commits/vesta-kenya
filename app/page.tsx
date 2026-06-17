@@ -11,7 +11,7 @@ const supabase = createClient(
 export default function Home() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const [role, setRole] = useState<'student' | 'landlord' | 'agent'>('student')
+  const [role, setRole] = useState<'student' | 'landlord'>('student')
   const [msg, setMsg] = useState('')
   const [loading, setLoading] = useState(false)
   const router = useRouter()
@@ -49,8 +49,6 @@ export default function Home() {
 
       if (role === 'student') {
         router.push('/browse')
-      } else if (role === 'agent') {
-        router.push('/agent')
       } else {
         router.push('/dashboard')
       }
@@ -83,9 +81,9 @@ export default function Home() {
 
         const dbRole = profile?.role || 'student'
 
-        // Handle role mismatch
-        if (dbRole !== role) {
-          setMsg(`⚠️ This account is registered as ${dbRole}. Select ${dbRole} button.`)
+        // Handle role mismatch for student/landlord
+        if (dbRole === 'student' && role !== 'student') {
+          setMsg(`⚠️ This account is registered as a student. Select the Student button.`)
           await supabase.auth.signOut()
           setLoading(false)
           return
@@ -94,6 +92,8 @@ export default function Home() {
         // Redirect based on role
         if (dbRole === 'student') {
           window.location.href = '/browse'
+        } else if (dbRole === 'admin') {
+          window.location.href = '/admin'
         } else if (dbRole === 'agent') {
           window.location.href = '/agent'
         } else {
@@ -124,18 +124,20 @@ export default function Home() {
         width: '100%',
         maxWidth: 450
       }}>
+        {/* Vesta Logo */}
         <div style={{ textAlign: 'center', marginBottom: 32 }}>
-          <h1 style={{ 
-            fontSize: 28, 
-            fontWeight: 800, 
-            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+          <div style={{ 
+            fontSize: 48, 
+            fontWeight: 900,
+            background: 'linear-gradient(135deg, #D4873A 0%, #B56B2E 100%)',
             WebkitBackgroundClip: 'text',
             WebkitTextFillColor: 'transparent',
-            marginBottom: 8
+            marginBottom: 8,
+            letterSpacing: '-2px'
           }}>
-            Welcome to Vesta
-          </h1>
-          <p style={{ color: '#6B5B4E', fontSize: 14 }}>Student Accommodation Platform</p>
+            Vesta
+          </div>
+          <p style={{ color: '#6B5B4E', fontSize: 14, margin: 0 }}>Student Accommodation Platform</p>
         </div>
 
         <div style={{ marginBottom: 24 }}>
@@ -233,24 +235,10 @@ export default function Home() {
             >
               🏠 Landlord
             </button>
-            <button
-              type="button"
-              onClick={() => setRole('agent')}
-              style={{
-                flex: 1,
-                padding: '10px',
-                background: role === 'agent' ? '#2196F3' : 'white',
-                color: role === 'agent' ? 'white' : '#1C1209',
-                border: '1px solid #DDD0C4',
-                borderRadius: 8,
-                cursor: 'pointer',
-                fontWeight: 600,
-                fontSize: 13
-              }}
-            >
-              👷 Agent
-            </button>
           </div>
+          <p style={{ fontSize: 11, color: '#999', margin: 0, textAlign: 'center' }}>
+            Admin & Agent accounts use the Landlord button
+          </p>
         </div>
 
         <div style={{ display: 'flex', gap: 12, marginBottom: 20 }}>
