@@ -244,7 +244,6 @@ export default function Home() {
 >
   👷 Agent
 </button>
-          </div>
         </div>
         
         {/* Login and Signup Buttons */}
