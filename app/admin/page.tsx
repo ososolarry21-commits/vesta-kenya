@@ -11,12 +11,13 @@ const supabase = createClient(
 export default function AdminPanel() {
   const [user, setUser] = useState<any>(null)
   const [listings, setListings] = useState<any[]>([])
+  const [agents, setAgents] = useState<any[]>([])
   const [filter, setFilter] = useState<'all' | 'pending_approval' | 'pending_verification' | 'verified'>('all')
   const [loading, setLoading] = useState(true)
-  const [showProofModal, setShowProofModal] = useState(false)
-  const [proofListingId, setProofListingId] = useState('')
-  const [proofImage, setProofImage] = useState<File | null>(null)
-  const [uploadingProof, setUploadingProof] = useState(false)
+  const [showAssignModal, setShowAssignModal] = useState(false)
+  const [assignListingId, setAssignListingId] = useState('')
+  const [selectedAgentId, setSelectedAgentId] = useState('')
+  const [assigning, setAssigning] = useState(false)
   const router = useRouter()
 
   useEffect(() => { checkAdmin() }, [])
@@ -35,6 +36,7 @@ export default function AdminPanel() {
 
     setUser(user)
     await fetchListings()
+    await fetchAgents()
     setLoading(false)
   }
 
@@ -44,6 +46,14 @@ export default function AdminPanel() {
       .select('*, profiles:landlord_id(name, email)')
       .order('created_at', { ascending: false })
     if (data) setListings(data)
+  }
+
+  async function fetchAgents() {
+    const { data } = await supabase
+      .from('profiles')
+      .select('id, name, email')
+      .eq('role', 'agent')
+    if (data) setAgents(data)
   }
 
   async function approveListing(listingId: string) {
@@ -58,39 +68,31 @@ export default function AdminPanel() {
     await fetchListings()
   }
 
-  async function handleVerifyWithProof() {
-    if (!proofListingId) return
-    if (!proofImage) { alert('Please upload a proof photo first!'); return }
+  async function assignAgent() {
+    if (!assignListingId || !selectedAgentId) {
+      alert('Please select an agent')
+      return
+    }
 
-    setUploadingProof(true)
+    setAssigning(true)
     try {
-      const fileExt = proofImage.name.split('.').pop()
-      const fileName = `proof-${proofListingId}-${Date.now()}.${fileExt}`
-      const { error: uploadError } = await supabase.storage
-        .from('verification-proofs')
-        .upload(fileName, proofImage)
-
-      if (uploadError) throw uploadError
-
-      const { data } = supabase.storage.from('verification-proofs').getPublicUrl(fileName)
-
-      await supabase
-        .from('listings')
-        .update({ 
-          is_verified: true,
-          verified_at: new Date().toISOString(),
-          verification_receipt: data.publicUrl 
+      const { error } = await supabase
+        .from('verification_assignments')
+        .insert({
+          listing_id: assignListingId,
+          agent_id: selectedAgentId
         })
-        .eq('id', proofListingId)
-      
-      alert('Property verified successfully!')
-      setShowProofModal(false)
-      setProofImage(null)
+
+      if (error) throw error
+
+      alert('✅ Agent assigned successfully!')
+      setShowAssignModal(false)
+      setSelectedAgentId('')
       await fetchListings()
     } catch (error: any) {
       alert('Error: ' + error.message)
     } finally {
-      setUploadingProof(false)
+      setAssigning(false)
     }
   }
 
@@ -273,11 +275,6 @@ export default function AdminPanel() {
                       }}>
                         {listing.status === 'approved' ? 'Approved' : listing.status === 'pending' ? 'Pending Approval' : 'Rejected'}
                       </span>
-                      {listing.verification_receipt && !listing.is_verified && (
-                        <span style={{ background: '#E3F2FD', color: '#1976D2', padding: '4px 10px', borderRadius: 6, fontSize: 11 }}>
-                          Receipt: {listing.verification_receipt}
-                        </span>
-                      )}
                     </div>
                   </div>
 
@@ -302,12 +299,12 @@ export default function AdminPanel() {
                     {listing.verification_payment_received && !listing.is_verified && (
                       <button 
                         onClick={() => {
-                          setProofListingId(listing.id)
-                          setShowProofModal(true)
+                          setAssignListingId(listing.id)
+                          setShowAssignModal(true)
                         }}
                         style={{ 
                           padding: '8px 16px', 
-                          background: 'linear-gradient(135deg, #007BFF, #0056b3)', 
+                          background: 'linear-gradient(135deg, #FF9800, #F57C00)', 
                           color: 'white', 
                           border: 'none', 
                           borderRadius: 6, 
@@ -315,8 +312,14 @@ export default function AdminPanel() {
                           fontWeight: 700 
                         }}
                       >
-                        ✓ Mark as Verified
+                        👷 Assign Agent
                       </button>
+                    )}
+                    
+                    {listing.is_verified && (
+                      <span style={{ padding: '8px 16px', background: '#E3F2FD', color: '#007BFF', borderRadius: 6, fontWeight: 'bold' }}>
+                        ✓ VERIFIED
+                      </span>
                     )}
                     
                     <button 
@@ -333,8 +336,8 @@ export default function AdminPanel() {
         )}
       </div>
 
-      {/* Agent Proof Modal */}
-      {showProofModal && (
+      {/* Assign Agent Modal */}
+      {showAssignModal && (
         <div style={{ 
           position: 'fixed', 
           inset: 0, 
@@ -352,54 +355,77 @@ export default function AdminPanel() {
             width: '90%',
             boxShadow: '0 20px 60px rgba(0,0,0,0.3)'
           }}>
-            <h2 style={{ margin: '0 0 16px 0', color: '#007BFF', textAlign: 'center', fontSize: 24 }}>
-              Agent Verification Proof
+            <h2 style={{ margin: '0 0 16px 0', color: '#FF9800', textAlign: 'center', fontSize: 24 }}>
+              Assign Agent
             </h2>
             <p style={{ color: '#6B5B4E', textAlign: 'center', marginBottom: 24, fontSize: 14 }}>
-              Upload a photo of the property to confirm the agent visited.
+              Select an agent to verify this property.
             </p>
-            <input 
-              type="file" 
-              accept="image/*" 
-              onChange={(e) => setProofImage(e.target.files?.[0] || null)} 
-              style={{ width: '100%', marginBottom: 20, padding: 12, border: '2px solid #DDD0C4', borderRadius: 8 }}
-            />
-            <div style={{ display: 'flex', gap: 12 }}>
-              <button 
-                onClick={() => {
-                  setShowProofModal(false)
-                  setProofImage(null)
-                }}
-                style={{ 
-                  flex: 1, 
-                  padding: '12px', 
-                  background: '#f0f0f0', 
-                  color: '#333', 
-                  border: 'none', 
-                  borderRadius: 8, 
-                  cursor: 'pointer', 
-                  fontWeight: 600 
-                }}
-              >
-                Cancel
-              </button>
-              <button 
-                onClick={handleVerifyWithProof}
-                disabled={uploadingProof}
-                style={{ 
-                  flex: 1, 
-                  padding: '12px', 
-                  background: uploadingProof ? '#999' : '#007BFF', 
-                  color: 'white', 
-                  border: 'none', 
-                  borderRadius: 8, 
-                  cursor: uploadingProof ? 'not-allowed' : 'pointer', 
-                  fontWeight: 700 
-                }}
-              >
-                {uploadingProof ? 'Uploading...' : 'Confirm Verification'}
-              </button>
-            </div>
+            
+            {agents.length === 0 ? (
+              <p style={{ textAlign: 'center', color: '#F44336' }}>
+                No agents registered yet. Create an agent account first.
+              </p>
+            ) : (
+              <>
+                <select 
+                  value={selectedAgentId}
+                  onChange={(e) => setSelectedAgentId(e.target.value)}
+                  style={{ 
+                    width: '100%', 
+                    padding: '12px', 
+                    border: '2px solid #DDD0C4', 
+                    borderRadius: 8,
+                    fontSize: 14,
+                    marginBottom: 20
+                  }}
+                >
+                  <option value="">Select an agent...</option>
+                  {agents.map((agent) => (
+                    <option key={agent.id} value={agent.id}>
+                      {agent.name || agent.email}
+                    </option>
+                  ))}
+                </select>
+                
+                <div style={{ display: 'flex', gap: 12 }}>
+                  <button 
+                    onClick={() => {
+                      setShowAssignModal(false)
+                      setSelectedAgentId('')
+                    }}
+                    style={{ 
+                      flex: 1, 
+                      padding: '12px', 
+                      background: '#f0f0f0', 
+                      color: '#333', 
+                      border: 'none', 
+                      borderRadius: 8, 
+                      cursor: 'pointer', 
+                      fontWeight: 600 
+                    }}
+                  >
+                    Cancel
+                  </button>
+                  <button 
+                    onClick={assignAgent}
+                    disabled={assigning || !selectedAgentId}
+                    style={{ 
+                      flex: 1, 
+                      padding: '12px', 
+                      background: assigning || !selectedAgentId ? '#999' : '#FF9800', 
+                      color: 'white', 
+                      border: 'none', 
+                      borderRadius: 8, 
+                      cursor: assigning || !selectedAgentId ? 'not-allowed' : 'pointer', 
+                      fontWeight: 700 
+                    }}
+                  >
+                    {assigning ? 'Assigning...' : 'Assign Agent'}
+                  </button>
+                </div>
+              </>
+            )}
           </div>
         </div>
       )}
