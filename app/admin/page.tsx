@@ -68,7 +68,7 @@ export default function AdminPanel() {
     await fetchListings()
   }
 
-  async function assignAgent() {
+   async function assignAgent() {
     if (!assignListingId || !selectedAgentId) {
       alert('Please select an agent')
       return
@@ -76,6 +76,26 @@ export default function AdminPanel() {
 
     setAssigning(true)
     try {
+      // Check if assignment already exists
+      const { data: existing } = await supabase
+        .from('verification_assignments')
+        .select('id, status')
+        .eq('listing_id', assignListingId)
+        .eq('agent_id', selectedAgentId)
+        .single()
+
+      if (existing) {
+        if (existing.status === 'completed') {
+          alert('This agent has already completed verification for this property.')
+        } else {
+          alert('This agent is already assigned to this property.')
+        }
+        setShowAssignModal(false)
+        setSelectedAgentId('')
+        return
+      }
+
+      // Create new assignment
       const { error } = await supabase
         .from('verification_assignments')
         .insert({
@@ -95,7 +115,7 @@ export default function AdminPanel() {
       setAssigning(false)
     }
   }
-
+  
   async function deleteListing(listingId: string) {
     if (!confirm('Delete this listing permanently?')) return
     await supabase.from('listings').delete().eq('id', listingId)
