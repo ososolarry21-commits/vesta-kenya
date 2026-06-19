@@ -49,6 +49,7 @@ export default function AdminPanel() {
           *,
           profiles:landlord_id(name, email)
         `)
+        .order('is_verified', { ascending: false })
         .order('created_at', { ascending: false })
       
       if (listingsError) {
