@@ -43,9 +43,32 @@ export default function AdminPanel() {
   async function fetchListings() {
     const { data } = await supabase
       .from('listings')
-      .select('*, profiles:landlord_id(name, email)')
+      .select(`
+        *,
+        profiles:landlord_id(name, email),
+        verification_assignments (
+          agent_id,
+          status,
+          proof_url,
+          profiles:name
+        )
+      `)
       .order('created_at', { ascending: false })
-    if (data) setListings(data)
+    
+    if (data) {
+      // Process to get the latest proof for each listing
+      const processed = data.map(listing => {
+        const completedAssignment = listing.verification_assignments?.find(
+          (a: any) => a.status === 'completed'
+        )
+        return {
+          ...listing,
+          proof_image_url: completedAssignment?.proof_url || null,
+          assigned_agent: completedAssignment?.profiles?.name || null
+        }
+      })
+      setListings(processed)
+    }
   }
 
   async function fetchAgents() {
@@ -68,7 +91,26 @@ export default function AdminPanel() {
     await fetchListings()
   }
 
-   async function assignAgent() {
+  async function verifyListing(listingId: string) {
+    if (!confirm('Mark this listing as verified?')) return
+    
+    try {
+      await supabase
+        .from('listings')
+        .update({ 
+          is_verified: true,
+          verified_at: new Date().toISOString()
+        })
+        .eq('id', listingId)
+      
+      alert('✅ Listing verified successfully!')
+      await fetchListings()
+    } catch (error: any) {
+      alert('Error: ' + error.message)
+    }
+  }
+
+  async function assignAgent() {
     if (!assignListingId || !selectedAgentId) {
       alert('Please select an agent')
       return
@@ -115,7 +157,7 @@ export default function AdminPanel() {
       setAssigning(false)
     }
   }
-  
+
   async function deleteListing(listingId: string) {
     if (!confirm('Delete this listing permanently?')) return
     await supabase.from('listings').delete().eq('id', listingId)
@@ -284,6 +326,11 @@ export default function AdminPanel() {
                     <p style={{ margin: '4px 0', color: '#D4873A', fontSize: 14, fontWeight: 600 }}>
                       KSh {listing.price?.toLocaleString()}/month
                     </p>
+                    {listing.assigned_agent && (
+                      <p style={{ margin: '4px 0', fontSize: 12, color: '#2196F3' }}>
+                        👷 Agent: {listing.assigned_agent}
+                      </p>
+                    )}
                     <div style={{ marginTop: 12, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                       <span style={{ 
                         padding: '4px 10px', 
@@ -296,6 +343,20 @@ export default function AdminPanel() {
                         {listing.status === 'approved' ? 'Approved' : listing.status === 'pending' ? 'Pending Approval' : 'Rejected'}
                       </span>
                     </div>
+
+                    {/* Show proof image if agent uploaded */}
+                    {listing.proof_image_url && (
+                      <div style={{ marginTop: 16, padding: 16, background: '#E8F5E9', borderRadius: 8 }}>
+                        <p style={{ margin: '0 0 12px 0', fontSize: 13, color: '#2E7D32', fontWeight: 600 }}>
+                          ✓ Agent Proof Uploaded
+                        </p>
+                        <img 
+                          src={listing.proof_image_url} 
+                          alt="Verification proof" 
+                          style={{ maxWidth: '300px', borderRadius: 6, border: '2px solid #4CAF50' }}
+                        />
+                      </div>
+                    )}
                   </div>
 
                   <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
@@ -317,23 +378,43 @@ export default function AdminPanel() {
                     )}
                     
                     {listing.verification_payment_received && !listing.is_verified && (
-                      <button 
-                        onClick={() => {
-                          setAssignListingId(listing.id)
-                          setShowAssignModal(true)
-                        }}
-                        style={{ 
-                          padding: '8px 16px', 
-                          background: 'linear-gradient(135deg, #FF9800, #F57C00)', 
-                          color: 'white', 
-                          border: 'none', 
-                          borderRadius: 6, 
-                          cursor: 'pointer', 
-                          fontWeight: 700 
-                        }}
-                      >
-                        👷 Assign Agent
-                      </button>
+                      <>
+                        <button 
+                          onClick={() => {
+                            setAssignListingId(listing.id)
+                            setShowAssignModal(true)
+                          }}
+                          style={{ 
+                            padding: '8px 16px', 
+                            background: 'linear-gradient(135deg, #FF9800, #F57C00)', 
+                            color: 'white', 
+                            border: 'none', 
+                            borderRadius: 6, 
+                            cursor: 'pointer', 
+                            fontWeight: 700 
+                          }}
+                        >
+                          👷 Assign Agent
+                        </button>
+                        
+                        {/* Show Mark as Verified if proof exists */}
+                        {listing.proof_image_url && (
+                          <button 
+                            onClick={() => verifyListing(listing.id)}
+                            style={{ 
+                              padding: '8px 16px', 
+                              background: '#4CAF50', 
+                              color: 'white', 
+                              border: 'none', 
+                              borderRadius: 6, 
+                              cursor: 'pointer', 
+                              fontWeight: 700 
+                            }}
+                          >
+                            ✓ Mark as Verified
+                          </button>
+                        )}
+                      </>
                     )}
                     
                     {listing.is_verified && (
