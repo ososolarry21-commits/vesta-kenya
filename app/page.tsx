@@ -81,31 +81,44 @@ export default function Home() {
 
         const dbRole = profile?.role || 'student'
 
-        // Handle role mismatch for student/landlord
-        if (dbRole === 'student' && role !== 'student') {
-          setMsg(`⚠️ This account is registered as a student. Select the Student button.`)
-          await supabase.auth.signOut()
+      // 1. Handle Admin Accounts (Must select 'Landlord' to access dashboard)
+      if (dbRole === 'admin') {
+        if (role !== 'landlord') {
+          setMsg('⚠️ This is an Admin account. Please select the "Landlord" button to log in.')
           setLoading(false)
           return
         }
-
-        // Redirect based on role
-        if (dbRole === 'student') {
-          window.location.href = '/browse'
-        } else if (dbRole === 'admin') {
-          window.location.href = '/admin'
-        } else if (dbRole === 'agent') {
-          window.location.href = '/agent'
-        } else {
-          window.location.href = '/dashboard'
-        }
+        // Admin selected Landlord, redirect to admin panel
+        window.location.href = '/admin'
+        return
       }
-    } catch (err) {
-      setMsg('An error occurred during login')
-    }
-    setLoading(false)
-  }
 
+      // 2. Handle Agent Accounts (Must select 'Landlord' to access agent portal)
+      if (dbRole === 'agent') {
+        if (role !== 'landlord') {
+          setMsg('⚠️ This is an Agent account. Please select the "Landlord" button to log in.')
+          setLoading(false)
+          return
+        }
+        // Agent selected Landlord, redirect to agent portal
+        window.location.href = '/agent'
+        return
+      }
+
+      // 3. Strict check for normal users (student/landlord)
+      if (dbRole !== role) {
+        setMsg(`⚠️ This account is registered as a ${dbRole}. Please select the ${dbRole} button to log in.`)
+        setLoading(false)
+        return
+      }
+
+      // 4. Redirect normal users
+      if (dbRole === 'student') {
+        window.location.href = '/browse'
+      } else {
+        window.location.href = '/dashboard'
+      }
+        
   return (
     <div style={{
       minHeight: '100vh',
