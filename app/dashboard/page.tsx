@@ -14,7 +14,7 @@ export default function Dashboard() {
   const [user, setUser] = useState<any>(null)
   const [profile, setProfile] = useState<any>(null)
   const [listings, setListings] = useState<any[]>([])
-  const [stats, setStats] = useState({ total: 0, active: 0, pending: 0 })
+  const [stats, setStats] = useState({ total: 0, active: 0, pending: 0, views: 0, contacts: 0 })
   const [loading, setLoading] = useState(true)
   const [showAddForm, setShowAddForm] = useState(false)
   const [uploadingImages, setUploadingImages] = useState(false)
@@ -76,7 +76,9 @@ export default function Dashboard() {
       setStats({
         total: data.length,
         active: data.filter((l: any) => l.status === 'approved').length,
-        pending: data.filter((l: any) => l.status === 'pending').length
+        pending: data.filter((l: any) => l.status === 'pending').length,
+        views: data.reduce((sum: number, l: any) => sum + (l.views || 0), 0),
+        contacts: data.reduce((sum: number, l: any) => sum + (l.contacts || 0), 0)
       })
     }
   }
@@ -232,6 +234,14 @@ export default function Dashboard() {
             <div style={{ fontSize: 36, fontWeight: 800, color: '#007BFF', marginBottom: 8 }}>{stats.pending}</div>
             <div style={{ color: '#6B5B4E', fontSize: 14 }}>Pending Approval</div>
           </div>
+          <div style={{ background: 'white', padding: 30, borderRadius: 16, boxShadow: '0 4px 20px rgba(0,0,0,0.06)' }}>
+            <div style={{ fontSize: 36, fontWeight: 800, color: '#9C27B0', marginBottom: 8 }}>{stats.views}</div>
+            <div style={{ color: '#6B5B4E', fontSize: 14 }}>Total Views</div>
+          </div>
+          <div style={{ background: 'white', padding: 30, borderRadius: 16, boxShadow: '0 4px 20px rgba(0,0,0,0.06)' }}>
+            <div style={{ fontSize: 36, fontWeight: 800, color: '#FF5722', marginBottom: 8 }}>{stats.contacts}</div>
+            <div style={{ color: '#6B5B4E', fontSize: 14 }}>Total Contacts</div>
+          </div>
         </div>
 
         <div style={{ marginBottom: 30 }}>
@@ -320,9 +330,15 @@ export default function Dashboard() {
                   <div>
                     <h3 style={{ margin: '0 0 6px 0', color: '#1C1209' }}>{listing.name}</h3>
                     <p style={{ margin: '0 0 8px 0', color: '#6B5B4E', fontSize: 14 }}>{listing.area}, {listing.city}</p>
-                    <div style={{ display: 'flex', gap: 12, fontSize: 14, flexWrap: 'wrap' }}>
+                    <div style={{ display: 'flex', gap: 12, fontSize: 14, flexWrap: 'wrap', alignItems: 'center' }}>
                       <span style={{ background: '#F0EAE3', padding: '4px 10px', borderRadius: 6 }}>{listing.type}</span>
                       <span style={{ fontWeight: 700, color: '#D4873A' }}>KSh {listing.price?.toLocaleString()}/mo</span>
+                      <span style={{ background: '#E8F5E9', color: '#2E7D32', padding: '4px 10px', borderRadius: 6, fontSize: 12, fontWeight: 600 }}>
+                        👁️ {listing.views || 0} views
+                      </span>
+                      <span style={{ background: '#FFF3E0', color: '#E65100', padding: '4px 10px', borderRadius: 6, fontSize: 12, fontWeight: 600 }}>
+                        📞 {listing.contacts || 0} contacts
+                      </span>
                     </div>
                   </div>
                 </div>
@@ -335,7 +351,7 @@ export default function Dashboard() {
                   {!listing.is_verified && !listing.verification_payment_received && listing.status === 'approved' && (
                     <button onClick={() => openPaymentModal(listing)} style={{ padding: '8px 16px', background: '#00C35D', color: 'white', border: 'none', borderRadius: 6, cursor: 'pointer', fontWeight: 600, fontSize: 12 }}>Verify - KSh 500</button>
                   )}
-                                    {listing.checkout_request_id && !listing.is_verified && !listing.verification_payment_received && (
+                  {listing.checkout_request_id && !listing.is_verified && !listing.verification_payment_received && (
                     <button 
                       onClick={async () => {
                         const res = await fetch('/api/mpesa/query', {
