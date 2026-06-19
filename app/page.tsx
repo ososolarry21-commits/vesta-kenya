@@ -1,7 +1,6 @@
 'use client'
-import { useState } from 'react'
 import { createClient } from '@supabase/supabase-js'
-import { useRouter } from 'next/navigation'
+import { useState } from 'react'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL || '',
@@ -11,21 +10,21 @@ const supabase = createClient(
 export default function Home() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
   const [role, setRole] = useState<'student' | 'landlord'>('student')
   const [msg, setMsg] = useState('')
   const [loading, setLoading] = useState(false)
-  const router = useRouter()
 
   async function signUp() {
     setLoading(true)
     setMsg('')
-
-    const { data, error } = await supabase.auth.signUp({
-      email,
+    
+    const { data, error } = await supabase.auth.signUp({ 
+      email, 
       password,
       options: { data: { role: role } }
     })
-
+    
     if (error) {
       setMsg(error.message)
       setLoading(false)
@@ -35,22 +34,22 @@ export default function Home() {
     if (data.user) {
       const { error: profileError } = await supabase
         .from('profiles')
-        .upsert({
-          id: data.user.id,
-          role: role,
-          email: email
+        .upsert({ 
+          id: data.user.id, 
+          name: email.split('@')[0], 
+          role: role
         })
-
+      
       if (profileError) {
-        setMsg('Error creating profile')
+        setMsg('Account created but profile failed: ' + profileError.message)
         setLoading(false)
         return
       }
 
       if (role === 'student') {
-        router.push('/browse')
+        window.location.href = '/browse'
       } else {
-        router.push('/dashboard')
+        window.location.href = '/dashboard'
       }
     }
     setLoading(false)
@@ -59,53 +58,47 @@ export default function Home() {
   async function logIn() {
     setLoading(true)
     setMsg('')
+    
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password })
+    
+    if (error) {
+      setMsg(error.message)
+      setLoading(false)
+      return
+    }
 
-    try {
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password
-      })
+    if (data.user) {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', data.user.id)
+        .single()
 
-      if (error) {
-        setMsg(error.message)
-        setLoading(false)
-        return
-      }
+      const dbRole = profile?.role || 'student'
 
-      if (data.user) {
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('role')
-          .eq('id', data.user.id)
-          .single()
-
-        const dbRole = profile?.role || 'student'
-
-      // 1. Handle Admin Accounts (Must select 'Landlord' to access dashboard)
+      // 1. Handle Admin Accounts
       if (dbRole === 'admin') {
         if (role !== 'landlord') {
           setMsg('⚠️ This is an Admin account. Please select the "Landlord" button to log in.')
           setLoading(false)
           return
         }
-        // Admin selected Landlord, redirect to admin panel
         window.location.href = '/admin'
         return
       }
 
-      // 2. Handle Agent Accounts (Must select 'Landlord' to access agent portal)
+      // 2. Handle Agent Accounts
       if (dbRole === 'agent') {
         if (role !== 'landlord') {
           setMsg('⚠️ This is an Agent account. Please select the "Landlord" button to log in.')
           setLoading(false)
           return
         }
-        // Agent selected Landlord, redirect to agent portal
         window.location.href = '/agent'
         return
       }
 
-      // 3. Strict check for normal users (student/landlord)
+      // 3. Strict check for normal users
       if (dbRole !== role) {
         setMsg(`⚠️ This account is registered as a ${dbRole}. Please select the ${dbRole} button to log in.`)
         setLoading(false)
@@ -118,9 +111,12 @@ export default function Home() {
       } else {
         window.location.href = '/dashboard'
       }
-        
+    }
+    setLoading(false)
+  }
+
   return (
-    <div style={{
+    <div style={{ 
       minHeight: '100vh',
       background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
       display: 'flex',
@@ -129,186 +125,139 @@ export default function Home() {
       fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
       padding: 20
     }}>
-      <div style={{
+      <div style={{ 
         background: 'white',
         padding: '50px 40px',
         borderRadius: 24,
         boxShadow: '0 20px 60px rgba(0,0,0,0.3)',
-        width: '100%',
-        maxWidth: 450
+        maxWidth: 450,
+        width: '100%'
       }}>
-        {/* Vesta Logo */}
-        <div style={{ textAlign: 'center', marginBottom: 32 }}>
-          <div style={{ 
-            fontSize: 48, 
-            fontWeight: 900,
-            background: 'linear-gradient(135deg, #D4873A 0%, #B56B2E 100%)',
-            WebkitBackgroundClip: 'text',
-            WebkitTextFillColor: 'transparent',
-            marginBottom: 8,
-            letterSpacing: '-2px'
-          }}>
-            Vesta
-          </div>
-          <p style={{ color: '#6B5B4E', fontSize: 14, margin: 0 }}>Student Accommodation Platform</p>
-        </div>
-
-        <div style={{ marginBottom: 24 }}>
-          <input
-            type="email"
-            placeholder="Email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            style={{
-              width: '100%',
-              padding: '14px 16px',
-              marginBottom: 16,
-              border: '2px solid #DDD0C4',
-              borderRadius: 12,
-              fontSize: 15,
-              boxSizing: 'border-box',
-              transition: 'border-color 0.3s'
-            }}
+        {/* LOGO */}
+        <div style={{ 
+          textAlign: 'center', 
+          marginBottom: 30,
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center'
+        }}>
+          <img 
+            src="/logo.png" 
+            alt="Vesta" 
+            style={{ 
+              height: '100px', 
+              width: 'auto',
+              maxWidth: '100%',
+              objectFit: 'contain',
+              marginBottom: '8px'
+            }} 
           />
+          <p style={{ color: '#6B5B4E', margin: 0, fontSize: 13, letterSpacing: '0.5px' }}>
+            Student Accommodation Platform
+          </p>
+        </div>
+        
+        {/* Email Input */}
+        <input
+          placeholder="Email Address"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          style={{ 
+            width: '100%', padding: '12px 14px', marginBottom: 12, boxSizing: 'border-box', 
+            border: '1px solid #DDD0C4', borderRadius: 8, fontSize: 16,
+            color: '#000000', background: '#FFFFFF', outline: 'none'
+          }}
+        />
+        
+        {/* Password Input with Show/Hide Toggle */}
+        <div style={{ position: 'relative', marginBottom: 16 }}>
           <input
-            type="password"
+            type={showPassword ? 'text' : 'password'}
             placeholder="Password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            style={{
-              width: '100%',
-              padding: '14px 16px',
-              border: '2px solid #DDD0C4',
-              borderRadius: 12,
-              fontSize: 15,
-              boxSizing: 'border-box',
-              transition: 'border-color 0.3s'
+            style={{ 
+              width: '100%', padding: '12px 45px 12px 14px', boxSizing: 'border-box', 
+              border: '1px solid #DDD0C4', borderRadius: 8, fontSize: 16,
+              color: '#000000', background: '#FFFFFF', outline: 'none'
             }}
           />
+          <button
+            type="button"
+            onClick={() => setShowPassword(!showPassword)}
+            style={{
+              position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)',
+              background: 'transparent', border: 'none', cursor: 'pointer',
+              fontSize: '20px', padding: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center'
+            }}
+            title={showPassword ? 'Hide password' : 'Show password'}
+          >
+            {showPassword ? '🙈' : '👁️'}
+          </button>
         </div>
 
-        {msg && (
-          <div style={{
-            padding: '12px 16px',
-            background: '#FFF3CD',
-            color: '#856404',
-            borderRadius: 8,
-            marginBottom: 20,
-            fontSize: 14,
-            display: 'flex',
-            alignItems: 'center',
-            gap: 8
-          }}>
-            <span>⚠️</span>
-            {msg}
-          </div>
-        )}
-
-        <div style={{ marginBottom: 24 }}>
-          <p style={{ 
-            fontSize: 13, 
-            fontWeight: 600, 
-            color: '#1C1209',
-            marginBottom: 12
-          }}>
-            I am a:
-          </p>
-          <div style={{ display: 'flex', gap: 12, marginBottom: 16 }}>
-            <button
+        {/* Role Selection */}
+        <div style={{ marginBottom: 20 }}>
+          <label style={{ display: 'block', marginBottom: 8, fontWeight: 600, color: '#1C1209', fontSize: 13 }}>I am a:</label>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button 
               type="button"
               onClick={() => setRole('student')}
-              style={{
-                flex: 1,
-                padding: '10px',
-                background: role === 'student' ? '#D4873A' : 'white',
+              style={{ 
+                flex: 1, padding: '10px', 
+                background: role === 'student' ? '#D4873A' : 'white', 
                 color: role === 'student' ? 'white' : '#1C1209',
-                border: '1px solid #DDD0C4',
-                borderRadius: 8,
-                cursor: 'pointer',
-                fontWeight: 600,
-                fontSize: 13
+                border: '1px solid #DDD0C4', borderRadius: 8, cursor: 'pointer', fontWeight: 600, fontSize: 13 
               }}
             >
               🎓 Student
             </button>
-            <button
+            <button 
               type="button"
               onClick={() => setRole('landlord')}
-              style={{
-                flex: 1,
-                padding: '10px',
-                background: role === 'landlord' ? '#D4873A' : 'white',
+              style={{ 
+                flex: 1, padding: '10px', 
+                background: role === 'landlord' ? '#D4873A' : 'white', 
                 color: role === 'landlord' ? 'white' : '#1C1209',
-                border: '1px solid #DDD0C4',
-                borderRadius: 8,
-                cursor: 'pointer',
-                fontWeight: 600,
-                fontSize: 13
+                border: '1px solid #DDD0C4', borderRadius: 8, cursor: 'pointer', fontWeight: 600, fontSize: 13 
               }}
             >
               🏠 Landlord
             </button>
           </div>
-          <p style={{ fontSize: 11, color: '#999', margin: 0, textAlign: 'center' }}>
-            Admin & Agent accounts use the Landlord button
-          </p>
         </div>
-
-        <div style={{ display: 'flex', gap: 12, marginBottom: 20 }}>
-          <button
-            onClick={logIn}
+        
+        {/* Login and Signup Buttons */}
+        <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+          <button 
+            onClick={logIn} 
             disabled={loading}
-            style={{
-              flex: 1,
-              padding: '14px',
-              background: loading ? '#ccc' : 'linear-gradient(135deg, #D4873A 0%, #B56B2E 100%)',
-              color: 'white',
-              border: 'none',
-              borderRadius: 12,
-              cursor: loading ? 'not-allowed' : 'pointer',
-              fontWeight: 700,
-              fontSize: 15,
-              boxShadow: '0 4px 12px rgba(212, 135, 58, 0.3)'
-            }}
+            style={{ flex: 1, padding: '12px', background: '#D4873A', color: 'white', border: 'none', borderRadius: 8, cursor: loading ? 'not-allowed' : 'pointer', fontWeight: 700, fontSize: 14, opacity: loading ? 0.6 : 1 }}
           >
-            {loading ? 'Please wait...' : 'Log In'}
+            {loading ? 'Processing...' : 'Log In'}
           </button>
-          <button
-            onClick={signUp}
+          <button 
+            onClick={signUp} 
             disabled={loading}
-            style={{
-              flex: 1,
-              padding: '14px',
-              background: loading ? '#ccc' : 'linear-gradient(135deg, #1C1209 0%, #3D2416 100%)',
-              color: 'white',
-              border: 'none',
-              borderRadius: 12,
-              cursor: loading ? 'not-allowed' : 'pointer',
-              fontWeight: 700,
-              fontSize: 15,
-              boxShadow: '0 4px 12px rgba(28, 18, 9, 0.3)'
-            }}
+            style={{ flex: 1, padding: '12px', background: '#333', color: 'white', border: 'none', borderRadius: 8, cursor: loading ? 'not-allowed' : 'pointer', fontWeight: 600, fontSize: 14, opacity: loading ? 0.6 : 1 }}
           >
-            Sign Up
+            {loading ? 'Processing...' : 'Sign Up'}
           </button>
         </div>
 
-        <div style={{ textAlign: 'center', marginTop: 24 }}>
-          <p style={{ color: '#8B735F', fontSize: 13, marginBottom: 12 }}>
-            Just browsing?
-          </p>
-          <button
-            onClick={() => router.push('/browse')}
-            style={{
-              padding: '12px 24px',
-              background: 'transparent',
-              color: '#D4873A',
-              border: '2px solid #D4873A',
-              borderRadius: 8,
-              cursor: 'pointer',
-              fontWeight: 600,
-              fontSize: 14
-            }}
+        {/* Error Message */}
+        {msg && (
+          <div style={{ padding: 12, background: '#F8D7DA', color: '#721C24', borderRadius: 8, fontSize: 13, textAlign: 'center', marginBottom: 16, border: '1px solid #F5C6CB' }}>
+            {msg}
+          </div>
+        )}
+
+        {/* Browse Link */}
+        <div style={{ marginTop: 20, textAlign: 'center' }}>
+          <p style={{ color: '#6B5B4E', fontSize: 13, marginBottom: 8 }}>Just browsing?</p>
+          <button 
+            onClick={() => window.location.href = '/browse'}
+            style={{ padding: '10px 24px', background: 'transparent', color: '#D4873A', border: '2px solid #D4873A', borderRadius: 8, cursor: 'pointer', fontWeight: 600, fontSize: 13 }}
           >
             Browse Student Housing →
           </button>
