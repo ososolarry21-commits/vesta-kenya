@@ -39,26 +39,25 @@ export default function AgentPortal() {
     setLoading(false)
   }
 
-  async function fetchAssignments(agentId: string) {
-    const { data } = await supabase
-      .from('verification_assignments')
-      .select(`
-        *,
-        listings (
-          name,
-          area,
-          city,
-          price,
-          type
-        )
-      `)
-      .eq('agent_id', agentId)
-      .eq('status', 'pending')
-      .order('assigned_at', { ascending: false })
+async function fetchAssignments(agentId: string) {
+  const { data } = await supabase
+    .from('verification_assignments')
+    .select(`
+      *,
+      listings (
+        name,
+        area,
+        city,
+        price,
+        type
+      )
+    `)
+    .eq('agent_id', agentId)
+    .in('status', ['pending', 'completed'])  // ← Show both pending and completed
+    .order('assigned_at', { ascending: false })
 
-    if (data) setAssignments(data)
-  }
-
+  if (data) setAssignments(data)
+}
   async function handleUpload(assignmentId: string, listingId: string, file: File) {
     setUploadingId(assignmentId)
     try {
@@ -155,31 +154,53 @@ export default function AgentPortal() {
             <p style={{ color: '#6B5B4E' }}>No pending verifications assigned to you.</p>
           </div>
         ) : (
-          <div style={{ display: 'grid', gap: 20 }}>
-            {assignments.map((assignment) => (
-              <div key={assignment.id} style={{ 
-                background: 'white', 
-                padding: 24, 
-                borderRadius: 12, 
-                boxShadow: '0 2px 12px rgba(0,0,0,0.06)' 
-              }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', gap: 20, flexWrap: 'wrap' }}>
-                  <div style={{ flex: 1, minWidth: 300 }}>
-                    <h3 style={{ margin: '0 0 8px 0', color: '#1C1209' }}>
+                <div style={{ display: 'grid', gap: 20 }}>
+          {assignments.map((assignment) => (
+            <div key={assignment.id} style={{
+              background: 'white',
+              padding: 24,
+              borderRadius: 12,
+              boxShadow: '0 2px 12px rgba(0,0,0,0.06)',
+              opacity: assignment.status === 'completed' ? 0.7 : 1
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', gap: 20, flexWrap: 'wrap' }}>
+                <div style={{ flex: 1, minWidth: 300 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8 }}>
+                    <h3 style={{ margin: 0, color: '#1C1209' }}>
                       {assignment.listings?.name}
                     </h3>
-                    <p style={{ margin: '4px 0', color: '#6B5B4E', fontSize: 14 }}>
-                      📍 {assignment.listings?.area}, {assignment.listings?.city}
-                    </p>
-                    <p style={{ margin: '4px 0', color: '#6B5B4E', fontSize: 14 }}>
-                      🏠 {assignment.listings?.type} • KSh {assignment.listings?.price?.toLocaleString()}/mo
-                    </p>
-                    <p style={{ margin: '12px 0 0 0', fontSize: 12, color: '#999' }}>
-                      Assigned: {new Date(assignment.assigned_at).toLocaleDateString()}
-                    </p>
+                    {assignment.status === 'completed' && (
+                      <span style={{ background: '#4CAF50', color: 'white', padding: '4px 12px', borderRadius: 6, fontSize: 11, fontWeight: 700 }}>
+                        ✓ COMPLETED
+                      </span>
+                    )}
                   </div>
+                  <p style={{ margin: '4px 0', color: '#6B5B4E', fontSize: 14 }}>
+                    📍 {assignment.listings?.area}, {assignment.listings?.city}
+                  </p>
+                  <p style={{ margin: '4px 0', color: '#6B5B4E', fontSize: 14 }}>
+                    🏠 {assignment.listings?.type} • KSh {assignment.listings?.price?.toLocaleString()}/mo
+                  </p>
+                  <p style={{ margin: '12px 0 0 0', fontSize: 12, color: '#999' }}>
+                    Assigned: {new Date(assignment.assigned_at).toLocaleDateString()}
+                  </p>
+                  
+                  {assignment.status === 'completed' && assignment.proof_url && (
+                    <div style={{ marginTop: 16, padding: 12, background: '#E8F5E9', borderRadius: 8 }}>
+                      <p style={{ margin: '0 0 8px 0', fontSize: 12, color: '#2E7D32', fontWeight: 600 }}>
+                        ✓ Proof uploaded successfully
+                      </p>
+                      <img 
+                        src={assignment.proof_url} 
+                        alt="Verification proof" 
+                        style={{ maxWidth: '200px', borderRadius: 6, border: '2px solid #4CAF50' }}
+                      />
+                    </div>
+                  )}
+                </div>
 
-                  <div>
+                <div>
+                  {assignment.status === 'pending' ? (
                     <label style={{ 
                       display: 'inline-block',
                       padding: '10px 20px', 
@@ -202,10 +223,23 @@ export default function AgentPortal() {
                         disabled={uploadingId === assignment.id}
                       />
                     </label>
-                  </div>
+                  ) : (
+                    <span style={{ 
+                      padding: '8px 16px', 
+                      background: '#E8F5E9', 
+                      color: '#2E7D32', 
+                      borderRadius: 6, 
+                      fontWeight: 600,
+                      fontSize: 13
+                    }}>
+                      ✓ Verified
+                    </span>
+                  )}
                 </div>
               </div>
-            ))}
+            </div>
+          ))}
+        </div>
           </div>
         )}
       </div>
