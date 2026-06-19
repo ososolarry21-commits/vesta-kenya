@@ -10,6 +10,7 @@ const supabase = createClient(
 
 export default function AgentPortal() {
   const [user, setUser] = useState<any>(null)
+  const [profile, setProfile] = useState<any>(null)
   const [assignments, setAssignments] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [uploadingId, setUploadingId] = useState<string | null>(null)
@@ -35,6 +36,7 @@ export default function AgentPortal() {
     }
 
     setUser(user)
+    setProfile(profile)
     await fetchAssignments(user.id)
     setLoading(false)
   }
@@ -110,7 +112,7 @@ export default function AgentPortal() {
 
   return (
     <div style={{ minHeight: '100vh', background: '#F5F5F5', fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" }}>
-      <nav style={{ 
+           <nav style={{ 
         background: 'white', 
         padding: '16px 60px', 
         display: 'flex', 
@@ -121,15 +123,23 @@ export default function AgentPortal() {
         <div>
           <h1 style={{ margin: 0, fontSize: 24, color: '#1C1209' }}>Agent Portal</h1>
           <p style={{ margin: '4px 0 0 0', fontSize: 13, color: '#6B5B4E' }}>
-            Welcome, {user?.email}
+            Welcome, {profile?.name || user?.email}
           </p>
         </div>
-        <button 
-          onClick={handleSignOut}
-          style={{ padding: '10px 20px', background: '#F44336', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer' }}
-        >
-          Sign Out
-        </button>
+        <div style={{ display: 'flex', gap: 12 }}>
+          <button 
+            onClick={() => router.push('/agent/settings')}
+            style={{ padding: '10px 20px', background: '#6C757D', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer' }}
+          >
+            ⚙️ Settings
+          </button>
+          <button 
+            onClick={handleSignOut}
+            style={{ padding: '10px 20px', background: '#F44336', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer' }}
+          >
+            Sign Out
+          </button>
+        </div>
       </nav>
 
       <div style={{ padding: '40px 60px', maxWidth: 1200, margin: '0 auto' }}>
