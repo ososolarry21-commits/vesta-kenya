@@ -102,44 +102,129 @@ export default function ListingDetails() {
       </nav>
 
       <div style={{ maxWidth: 1000, margin: '0 auto', padding: '20px' }}>
-        {/* Image Gallery */}
-        <div style={{ position: 'relative', borderRadius: 16, overflow: 'hidden', marginBottom: 24, boxShadow: '0 4px 20px rgba(0,0,0,0.08)' }}>
-          <div style={{ height: 400, background: listing.images?.[currentImage] ? `url("${listing.images[currentImage]}") center/cover` : 'linear-gradient(135deg, #D4873A, #E8B86D)', transition: 'background 0.3s ease' }}></div>
+              {/* Image Gallery */}
+      <div style={{ position: 'relative', borderRadius: 16, overflow: 'hidden', marginBottom: 24, boxShadow: '0 4px 20px rgba(0,0,0,0.08)' }}>
+        {/* Main Image Display */}
+        <div style={{ 
+          height: 400, 
+          background: (() => {
+            // Handle images safely - check if it's an array or string
+            const images = listing.images || [];
+            const currentImg = Array.isArray(images) ? images[currentImage] : images;
+            return currentImg ? `url("${currentImg}") center/cover` : 'linear-gradient(135deg, #D4873A, #E8B86D)';
+          })(),
+          transition: 'background 0.3s ease'
+        }}>
+          {/* Fallback if no image */}
+          {!listing.images || listing.images.length === 0}
+        </div>
+        
+        {/* Navigation Arrows - Only show if more than 1 image */}
+        {(() => {
+          const images = listing.images || [];
+          const imageCount = Array.isArray(images) ? images.length : (images ? 1 : 0);
           
-          {listing.images && listing.images.length > 1 && (
+          return imageCount > 1 ? (
             <>
               <button 
-                onClick={() => setCurrentImage(prev => prev === 0 ? listing.images.length - 1 : prev - 1)}
-                style={{ position: 'absolute', left: 16, top: '50%', transform: 'translateY(-50%)', background: 'rgba(255,255,255,0.9)', border: 'none', borderRadius: '50%', width: 40, height: 40, cursor: 'pointer', fontSize: 20, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                onClick={() => setCurrentImage(prev => prev === 0 ? imageCount - 1 : prev - 1)}
+                style={{ 
+                  position: 'absolute', 
+                  left: 16, 
+                  top: '50%', 
+                  transform: 'translateY(-50%)', 
+                  background: 'rgba(255,255,255,0.9)', 
+                  border: 'none', 
+                  borderRadius: '50%', 
+                  width: 40, 
+                  height: 40, 
+                  cursor: 'pointer', 
+                  fontSize: 20, 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  justifyContent: 'center',
+                  color: '#1C1209'
+                }}
               >
                 ‹
               </button>
               <button 
-                onClick={() => setCurrentImage(prev => prev === listing.images.length - 1 ? 0 : prev + 1)}
-                style={{ position: 'absolute', right: 16, top: '50%', transform: 'translateY(-50%)', background: 'rgba(255,255,255,0.9)', border: 'none', borderRadius: '50%', width: 40, height: 40, cursor: 'pointer', fontSize: 20, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                onClick={() => setCurrentImage(prev => prev === imageCount - 1 ? 0 : prev + 1)}
+                style={{ 
+                  position: 'absolute', 
+                  right: 16, 
+                  top: '50%', 
+                  transform: 'translateY(-50%)', 
+                  background: 'rgba(255,255,255,0.9)', 
+                  border: 'none', 
+                  borderRadius: '50%', 
+                  width: 40, 
+                  height: 40, 
+                  cursor: 'pointer', 
+                  fontSize: 20, 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  justifyContent: 'center',
+                  color: '#1C1209'
+                }}
               >
                 ›
               </button>
-              <div style={{ position: 'absolute', bottom: 16, left: '50%', transform: 'translateX(-50%)', display: 'flex', gap: 6 }}>
-                {listing.images.map((_: any, idx: number) => (
-                  <div key={idx} style={{ width: 8, height: 8, borderRadius: '50%', background: idx === currentImage ? 'white' : 'rgba(255,255,255,0.5)', transition: 'all 0.2s' }}></div>
+              
+              {/* Image Dots Indicator */}
+              <div style={{ 
+                position: 'absolute', 
+                bottom: 16, 
+                left: '50%', 
+                transform: 'translateX(-50%)', 
+                display: 'flex', 
+                gap: 6 
+              }}>
+                {Array.from({ length: imageCount }, (_, idx) => (
+                  <div 
+                    key={idx} 
+                    style={{ 
+                      width: 8, 
+                      height: 8, 
+                      borderRadius: '50%', 
+                      background: idx === currentImage ? 'white' : 'rgba(255,255,255,0.5)', 
+                      transition: 'all 0.2s' 
+                    }}
+                  />
                 ))}
               </div>
             </>
-          )}
-          
-          {/* Badges */}
-          <div style={{ position: 'absolute', top: 16, left: 16, display: 'flex', gap: 8 }}>
-            {listing.is_verified && (
-              <span style={{ background: 'linear-gradient(135deg, #007BFF, #0056b3)', color: 'white', padding: '6px 12px', borderRadius: 8, fontSize: 12, fontWeight: 800, boxShadow: '0 2px 10px rgba(0,123,255,0.3)' }}>
-                ★ VERIFIED
-              </span>
-            )}
-            <span style={{ background: 'rgba(28,18,9,0.85)', color: 'white', padding: '6px 12px', borderRadius: 8, fontSize: 12, fontWeight: 700, backdropFilter: 'blur(4px)' }}>
-              {listing.type}
+          ) : null;
+        })()}
+        
+        {/* Badges */}
+        <div style={{ position: 'absolute', top: 16, left: 16, display: 'flex', gap: 8 }}>
+          {listing.is_verified && (
+            <span style={{ 
+              background: 'linear-gradient(135deg, #007BFF, #0056b3)', 
+              color: 'white', 
+              padding: '6px 12px', 
+              borderRadius: 8, 
+              fontSize: 12, 
+              fontWeight: 800, 
+              boxShadow: '0 2px 10px rgba(0,123,255,0.3)' 
+            }}>
+              ★ VERIFIED
             </span>
-          </div>
+          )}
+          <span style={{ 
+            background: 'rgba(28,18,9,0.85)', 
+            color: 'white', 
+            padding: '6px 12px', 
+            borderRadius: 8, 
+            fontSize: 12, 
+            fontWeight: 700, 
+            backdropFilter: 'blur(4px)' 
+          }}>
+            {listing.type}
+          </span>
         </div>
+      </div>
 
         {/* Content Grid */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 24 }}>
