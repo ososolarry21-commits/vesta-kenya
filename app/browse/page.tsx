@@ -33,6 +33,17 @@ export default function BrowseListings() {
     setLoading(false);
   }
 
+  async function trackView(listingId: string) {
+    try {
+      await supabase
+        .from('listings')
+        .update({ views: (listings.find(l => l.id === listingId)?.views || 0) + 1 })
+        .eq('id', listingId);
+    } catch (error) {
+      console.error('Error tracking view:', error);
+    }
+  }
+
   const filteredListings = listings.filter((listing) => {
     const matchesSearch =
       searchTerm === '' ||
@@ -314,7 +325,10 @@ export default function BrowseListings() {
             {filteredListings.map((listing, index) => (
               <div
                 key={listing.id}
-                onClick={() => router.push(`/browse/${listing.id}`)}
+                onClick={() => {
+                  trackView(listing.id);
+                  router.push(`/browse/${listing.id}`);
+                }}
                 style={{
                   background: 'white',
                   borderRadius: 12,
