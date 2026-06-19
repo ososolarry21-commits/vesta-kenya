@@ -1,657 +1,278 @@
-'use client';
-import { useEffect, useState } from 'react';
-import { createClient } from '@supabase/supabase-js';
-import { useParams, useRouter } from 'next/navigation';
+'use client'
+import { useEffect, useState } from 'react'
+import { createClient } from '@supabase/supabase-js'
+import { useParams, useRouter } from 'next/navigation'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL || '',
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
-);
+)
 
-export default function PropertyPage() {
-  const params = useParams();
-  const router = useRouter();
-  const id = params.id as string;
-
-  const [listing, setListing] = useState<any>(null);
-  const [landlordPhone, setLandlordPhone] = useState('');
-  const [loading, setLoading] = useState(true);
-  const [user, setUser] = useState<any>(null);
-  const [isSaved, setIsSaved] = useState(false);
-  const [saving, setSaving] = useState(false);
-
-  // Review States
-  const [reviews, setReviews] = useState<any[]>([]);
-  const [rating, setRating] = useState(5);
-  const [comment, setComment] = useState('');
-  const [submittingReview, setSubmittingReview] = useState(false);
+export default function ListingDetails() {
+  const { id } = useParams()
+  const router = useRouter()
+  const [listing, setListing] = useState<any>(null)
+  const [landlord, setLandlord] = useState<any>(null)
+  const [loading, setLoading] = useState(true)
+  const [currentImage, setCurrentImage] = useState(0)
+  const [showContact, setShowContact] = useState(false)
 
   useEffect(() => {
-    const fetchData = async () => {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      setUser(user);
+    if (id) fetchListing()
+  }, [id])
 
-      const { data: listingData } = await supabase
+  async function fetchListing() {
+    try {
+      // Fetch listing and landlord profile in one go
+      const { data, error } = await supabase
         .from('listings')
-        .select('*')
+        .select(`
+          *,
+          profiles:landlord_id (name, email)
+        `)
         .eq('id', id)
-        .single();
-      if (!listingData) {
-        router.push('/browse');
-        return;
-      }
-      setListing(listingData);
+        .single()
 
-      const { data: profileData } = await supabase
-        .from('profiles')
-        .select('phone')
-        .eq('id', listingData.landlord_id)
-        .single();
-      if (profileData?.phone) setLandlordPhone(profileData.phone);
-
-      // Fetch Reviews
-      const { data: reviewsData } = await supabase
-        .from('reviews')
-        .select('*, profiles(name, role)')
-        .eq('listing_id', id)
-        .order('created_at', { ascending: false });
-
-      if (reviewsData) setReviews(reviewsData);
-
-      if (user) {
-        const { data: savedData } = await supabase
-          .from('saved_properties')
-          .select('id')
-          .eq('user_id', user.id)
-          .eq('listing_id', id)
-          .single();
-        setIsSaved(!!savedData);
-      }
-      setLoading(false);
-    };
-    fetchData();
-  }, [id]);
-
-  const handleWhatsAppClick = () => {
-    let cleanNumber = landlordPhone.replace(/[\s\-\+]/g, '');
-    if (cleanNumber.startsWith('0'))
-      cleanNumber = '254' + cleanNumber.substring(1);
-    else if (!cleanNumber.startsWith('254')) cleanNumber = '254' + cleanNumber;
-
-    const message = encodeURIComponent(
-      `Hi! I found your listing "${listing.name}" on Vesta Kenya. Is it still available?`
-    );
-    window.open(`https://wa.me/${cleanNumber}?text=${message}`, '_blank');
-  };
-
-  const toggleSave = async () => {
-    if (!user) {
-      alert('Please log in to save properties!');
-      router.push('/');
-      return;
+      if (error) throw error
+      
+      setListing(data)
+      setLandlord(data.profiles)
+    } catch (error) {
+      console.error('Error fetching listing:', error)
+    } finally {
+      setLoading(false)
     }
-    setSaving(true);
-    if (isSaved) {
+  }
+
+  // --- CONTACT TRACKING FUNCTION ---
+  async function trackContact() {
+    try {
       await supabase
-        .from('saved_properties')
-        .delete()
-        .eq('user_id', user.id)
-        .eq('listing_id', id);
-      setIsSaved(false);
-    } else {
-      await supabase
-        .from('saved_properties')
-        .insert({ user_id: user.id, listing_id: id });
-      setIsSaved(true);
+        .from('listings')
+        .update({ contacts: (listing.contacts || 0) + 1 })
+        .eq('id', listing.id)
+      
+      // Update local state so UI reflects it immediately if needed
+      setListing({ ...listing, contacts: (listing.contacts || 0) + 1 })
+    } catch (error) {
+      console.error('Error tracking contact:', error)
     }
-    setSaving(false);
-  };
+  }
 
-  const submitReview = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!user) {
-      alert('Please log in to leave a review!');
-      router.push('/');
-      return;
-    }
-    setSubmittingReview(true);
+  const handleContactClick = () => {
+    trackContact()
+    setShowContact(true)
+  }
 
-    const { error } = await supabase.from('reviews').insert({
-      listing_id: id,
-      user_id: user.id,
-      rating: rating,
-      comment: comment,
-    });
-
-    if (error) {
-      alert('Error submitting review: ' + error.message);
-    } else {
-      setComment('');
-      setRating(5);
-      // Refresh reviews
-      const { data: reviewsData } = await supabase
-        .from('reviews')
-        .select('*, profiles(name, role)')
-        .eq('listing_id', id)
-        .order('created_at', { ascending: false });
-      if (reviewsData) setReviews(reviewsData);
-    }
-    setSubmittingReview(false);
-  };
-
-  if (loading)
+  if (loading) {
     return (
-      <div
-        style={{
-          minHeight: '100vh',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          background: '#FDF8F3',
-        }}
-      >
-        Loading...
+      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#FDF8F3' }}>
+        <div style={{ textAlign: 'center' }}>
+          <div style={{ fontSize: 40, marginBottom: 16 }}>⏳</div>
+          <div style={{ color: '#6B5B4E' }}>Loading property details...</div>
+        </div>
       </div>
-    );
-  if (!listing) return null;
+    )
+  }
+
+  if (!listing) {
+    return (
+      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#FDF8F3' }}>
+        <div style={{ textAlign: 'center' }}>
+          <div style={{ fontSize: 40, marginBottom: 16 }}></div>
+          <h2 style={{ color: '#1C1209' }}>Property Not Found</h2>
+          <button onClick={() => router.push('/browse')} style={{ marginTop: 20, padding: '10px 20px', background: '#D4873A', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer' }}>
+            Back to Browse
+          </button>
+        </div>
+      </div>
+    )
+  }
 
   return (
-    <div
-      style={{
-        minHeight: '100vh',
-        background: '#FDF8F3',
-        fontFamily:
-          "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
-      }}
-    >
+    <div style={{ minHeight: '100vh', background: '#FDF8F3', fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" }}>
       {/* Navigation */}
-      <nav
-        style={{
-          background: 'white',
-          padding: '16px 20px',
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          boxShadow: '0 2px 20px rgba(0,0,0,0.05)',
-        }}
-      >
-        <div
-          style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }}
-          onClick={() => router.push('/browse')}
-        >
-          <img
-            src="/logo.png"
-            alt="Vesta"
-            style={{ height: '45px', width: 'auto', objectFit: 'contain' }}
-          />
+      <nav style={{ background: 'white', padding: '12px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', boxShadow: '0 2px 15px rgba(0,0,0,0.05)', position: 'sticky', top: 0, zIndex: 100 }}>
+        <div style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }} onClick={() => router.push('/')}>
+          <img src="/logo.png" alt="Vesta" style={{ height: '45px', width: 'auto', objectFit: 'contain' }} />
         </div>
-        <div style={{ display: 'flex', gap: 12 }}>
-          <button
-            onClick={() => router.push('/browse/saved')}
-            style={{
-              padding: '8px 16px',
-              background: 'transparent',
-              border: '2px solid #DDD0C4',
-              borderRadius: 8,
-              cursor: 'pointer',
-              fontWeight: 600,
-            }}
-          >
-            ❤️ Saved
-          </button>
-          <button
-            onClick={() => router.push('/browse')}
-            style={{
-              padding: '8px 16px',
-              background: 'transparent',
-              border: '2px solid #DDD0C4',
-              borderRadius: 8,
-              cursor: 'pointer',
-              fontWeight: 600,
-            }}
-          >
-            ← Back
-          </button>
-        </div>
+        <button onClick={() => router.push('/browse')} style={{ padding: '8px 16px', background: '#F0EAE3', color: '#1C1209', border: 'none', borderRadius: 8, cursor: 'pointer', fontWeight: 600, fontSize: 14 }}>
+          ← Back to Listings
+        </button>
       </nav>
 
-      {/* Main Image */}
-      <div
-        style={{
-          height: 350,
-          background: listing.images?.[0]
-            ? `url("${listing.images[0]}") center/cover`
-            : 'linear-gradient(135deg, #D4873A, #E8B86D)',
-          position: 'relative',
-        }}
-      >
-        <div
-          style={{
-            position: 'absolute',
-            inset: 0,
-            background: 'linear-gradient(to top, rgba(0,0,0,0.6), transparent)',
-          }}
-        />
-        <div
-          style={{
-            position: 'absolute',
-            bottom: 30,
-            left: 20,
-            right: 20,
-            color: 'white',
-          }}
-        >
-          <div
-            style={{
-              display: 'inline-block',
-              background: '#D4873A',
-              padding: '6px 16px',
-              borderRadius: 8,
-              fontSize: 14,
-              fontWeight: 700,
-              marginBottom: 12,
-            }}
-          >
-            {listing.type}
-          </div>
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 12,
-              flexWrap: 'wrap',
-            }}
-          >
-            <h1 style={{ fontSize: 32, fontWeight: 800, margin: 0 }}>
-              {listing.name}
-            </h1>
-            {listing.is_verified && (
-              <span
-                style={{
-                  background: 'linear-gradient(135deg, #FFD700, #FFA500)',
-                  color: '#1C1209',
-                  fontSize: 12,
-                  padding: '6px 12px',
-                  borderRadius: 6,
-                  fontWeight: 800,
-                }}
+      <div style={{ maxWidth: 1000, margin: '0 auto', padding: '20px' }}>
+        {/* Image Gallery */}
+        <div style={{ position: 'relative', borderRadius: 16, overflow: 'hidden', marginBottom: 24, boxShadow: '0 4px 20px rgba(0,0,0,0.08)' }}>
+          <div style={{ height: 400, background: listing.images?.[currentImage] ? `url("${listing.images[currentImage]}") center/cover` : 'linear-gradient(135deg, #D4873A, #E8B86D)', transition: 'background 0.3s ease' }}></div>
+          
+          {listing.images && listing.images.length > 1 && (
+            <>
+              <button 
+                onClick={() => setCurrentImage(prev => prev === 0 ? listing.images.length - 1 : prev - 1)}
+                style={{ position: 'absolute', left: 16, top: '50%', transform: 'translateY(-50%)', background: 'rgba(255,255,255,0.9)', border: 'none', borderRadius: '50%', width: 40, height: 40, cursor: 'pointer', fontSize: 20, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
               >
-                ★ VESTA VERIFIED
+                ‹
+              </button>
+              <button 
+                onClick={() => setCurrentImage(prev => prev === listing.images.length - 1 ? 0 : prev + 1)}
+                style={{ position: 'absolute', right: 16, top: '50%', transform: 'translateY(-50%)', background: 'rgba(255,255,255,0.9)', border: 'none', borderRadius: '50%', width: 40, height: 40, cursor: 'pointer', fontSize: 20, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+              >
+                ›
+              </button>
+              <div style={{ position: 'absolute', bottom: 16, left: '50%', transform: 'translateX(-50%)', display: 'flex', gap: 6 }}>
+                {listing.images.map((_: any, idx: number) => (
+                  <div key={idx} style={{ width: 8, height: 8, borderRadius: '50%', background: idx === currentImage ? 'white' : 'rgba(255,255,255,0.5)', transition: 'all 0.2s' }}></div>
+                ))}
+              </div>
+            </>
+          )}
+          
+          {/* Badges */}
+          <div style={{ position: 'absolute', top: 16, left: 16, display: 'flex', gap: 8 }}>
+            {listing.is_verified && (
+              <span style={{ background: 'linear-gradient(135deg, #007BFF, #0056b3)', color: 'white', padding: '6px 12px', borderRadius: 8, fontSize: 12, fontWeight: 800, boxShadow: '0 2px 10px rgba(0,123,255,0.3)' }}>
+                ★ VERIFIED
               </span>
             )}
+            <span style={{ background: 'rgba(28,18,9,0.85)', color: 'white', padding: '6px 12px', borderRadius: 8, fontSize: 12, fontWeight: 700, backdropFilter: 'blur(4px)' }}>
+              {listing.type}
+            </span>
           </div>
-          <p style={{ fontSize: 16, margin: '8px 0 0 0', opacity: 0.9 }}>
-            📍 {listing.area}, {listing.city}
-          </p>
         </div>
-      </div>
 
-      {/* Content Grid */}
-      <div
-        style={{
-          maxWidth: 1200,
-          margin: '0 auto',
-          padding: '20px',
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
-          gap: 30,
-        }}
-      >
-        {/* Left Column: Details & Reviews */}
-        <div>
-          {/* Property Details */}
-          <div
-            style={{
-              background: 'white',
-              padding: 24,
-              borderRadius: 16,
-              boxShadow: '0 4px 20px rgba(0,0,0,0.05)',
-              marginBottom: 24,
-            }}
-          >
-            <h2 style={{ color: '#1C1209', marginTop: 0 }}>
-              About this property
-            </h2>
-            <p style={{ color: '#6B5B4E', lineHeight: 1.6 }}>
-              {listing.description || 'No description provided.'}
-            </p>
-
-            <h3 style={{ color: '#1C1209', marginTop: 24 }}>
-              Amenities & Features
-            </h3>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-              {listing.amenities?.map((amenity: string, i: number) => (
-                <span
-                  key={i}
-                  style={{
-                    background: '#F0EAE3',
-                    color: '#1C1209',
-                    padding: '6px 12px',
-                    borderRadius: 6,
-                    fontSize: 13,
-                    fontWeight: 600,
-                  }}
-                >
-                  {amenity}
-                </span>
-              ))}
+        {/* Content Grid */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 24 }}>
+          {/* Left Column: Details */}
+          <div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: 16 }}>
+              <div>
+                <h1 style={{ margin: '0 0 8px 0', fontSize: 28, fontWeight: 800, color: '#1C1209' }}>{listing.name}</h1>
+                <p style={{ margin: 0, fontSize: 16, color: '#6B5B4E' }}>📍 {listing.area}, {listing.city}</p>
+              </div>
+              <div style={{ textAlign: 'right' }}>
+                <div style={{ fontSize: 24, fontWeight: 800, color: '#D4873A' }}>KSh {listing.price?.toLocaleString()}</div>
+                <div style={{ fontSize: 13, color: '#6B5B4E' }}>per month</div>
+              </div>
             </div>
-          </div>
 
-          {/* REVIEWS SECTION */}
-          <div
-            style={{
-              background: 'white',
-              padding: 24,
-              borderRadius: 16,
-              boxShadow: '0 4px 20px rgba(0,0,0,0.05)',
-            }}
-          >
-            <h2
-              style={{
-                color: '#1C1209',
-                marginTop: 0,
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-              }}
-            >
-              Student Reviews
-              <span style={{ fontSize: 14, color: '#6B5B4E', fontWeight: 500 }}>
-                {reviews.length} reviews
-              </span>
-            </h2>
+            <div style={{ background: 'white', padding: 24, borderRadius: 12, marginBottom: 20, boxShadow: '0 2px 12px rgba(0,0,0,0.04)' }}>
+              <h3 style={{ margin: '0 0 16px 0', color: '#1C1209', fontSize: 18 }}>Property Details</h3>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+                <div>
+                  <div style={{ fontSize: 12, color: '#999', marginBottom: 4 }}>Type</div>
+                  <div style={{ fontWeight: 600, color: '#1C1209' }}>{listing.type}</div>
+                </div>
+                <div>
+                  <div style={{ fontSize: 12, color: '#999', marginBottom: 4 }}>Gender</div>
+                  <div style={{ fontWeight: 600, color: '#1C1209' }}>{listing.gender}</div>
+                </div>
+                <div>
+                  <div style={{ fontSize: 12, color: '#999', marginBottom: 4 }}>Deposit</div>
+                  <div style={{ fontWeight: 600, color: '#1C1209' }}>{listing.deposit ? `KSh ${listing.deposit.toLocaleString()}` : 'None'}</div>
+                </div>
+                <div>
+                  <div style={{ fontSize: 12, color: '#999', marginBottom: 4 }}>Distance</div>
+                  <div style={{ fontWeight: 600, color: '#1C1209' }}>{listing.distance || 'N/A'}</div>
+                </div>
+              </div>
+            </div>
 
-            {/* Submit Review Form */}
-            <form
-              onSubmit={submitReview}
-              style={{
-                marginBottom: 24,
-                padding: 16,
-                background: '#FDF8F3',
-                borderRadius: 12,
-              }}
-            >
-              <h3 style={{ margin: '0 0 12px 0', fontSize: 16 }}>
-                Leave a Review
-              </h3>
-              <div style={{ marginBottom: 12 }}>
-                <label
-                  style={{ fontSize: 13, fontWeight: 600, color: '#1C1209' }}
-                >
-                  Rating:
-                </label>
-                <div style={{ display: 'flex', gap: 4, marginTop: 4 }}>
-                  {[1, 2, 3, 4, 5].map((star) => (
-                    <button
-                      key={star}
-                      type="button"
-                      onClick={() => setRating(star)}
-                      style={{
-                        background: 'none',
-                        border: 'none',
-                        cursor: 'pointer',
-                        fontSize: 24,
-                        color: star <= rating ? '#FFD700' : '#DDD0C4',
-                      }}
-                    >
-                      ★
-                    </button>
+            {listing.description && (
+              <div style={{ background: 'white', padding: 24, borderRadius: 12, marginBottom: 20, boxShadow: '0 2px 12px rgba(0,0,0,0.04)' }}>
+                <h3 style={{ margin: '0 0 12px 0', color: '#1C1209', fontSize: 18 }}>Description</h3>
+                <p style={{ margin: 0, color: '#4a4a4a', lineHeight: 1.6, fontSize: 15 }}>{listing.description}</p>
+              </div>
+            )}
+
+            {listing.amenities && listing.amenities.length > 0 && (
+              <div style={{ background: 'white', padding: 24, borderRadius: 12, marginBottom: 20, boxShadow: '0 2px 12px rgba(0,0,0,0.04)' }}>
+                <h3 style={{ margin: '0 0 16px 0', color: '#1C1209', fontSize: 18 }}>Amenities</h3>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                  {listing.amenities.map((amenity: string, idx: number) => (
+                    <span key={idx} style={{ background: '#F0EAE3', color: '#1C1209', padding: '6px 12px', borderRadius: 6, fontSize: 13, fontWeight: 600 }}>
+                      ✓ {amenity}
+                    </span>
                   ))}
                 </div>
               </div>
-              <textarea
-                placeholder="Share your experience with this property..."
-                value={comment}
-                onChange={(e) => setComment(e.target.value)}
-                required
-                rows={3}
-                style={{
-                  width: '100%',
-                  padding: 10,
-                  border: '1px solid #DDD0C4',
-                  borderRadius: 8,
-                  fontSize: 14,
-                  boxSizing: 'border-box',
-                  marginBottom: 12,
-                }}
-              />
-              <button
-                type="submit"
-                disabled={submittingReview}
-                style={{
-                  padding: '10px 20px',
-                  background: '#D4873A',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: 8,
-                  cursor: 'pointer',
-                  fontWeight: 600,
-                }}
-              >
-                {submittingReview ? 'Posting...' : 'Post Review'}
-              </button>
-            </form>
-
-            {/* Reviews List */}
-            {reviews.length === 0 ? (
-              <p style={{ color: '#6B5B4E', textAlign: 'center', padding: 20 }}>
-                No reviews yet. Be the first!
-              </p>
-            ) : (
-              <div
-                style={{ display: 'flex', flexDirection: 'column', gap: 16 }}
-              >
-                {reviews.map((review) => (
-                  <div
-                    key={review.id}
-                    style={{
-                      borderBottom: '1px solid #F0EAE3',
-                      paddingBottom: 16,
-                    }}
-                  >
-                    <div
-                      style={{
-                        display: 'flex',
-                        justifyContent: 'space-between',
-                        alignItems: 'center',
-                        marginBottom: 8,
-                      }}
-                    >
-                      <div
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: 8,
-                        }}
-                      >
-                        <div
-                          style={{
-                            width: 32,
-                            height: 32,
-                            background: '#D4873A',
-                            color: 'white',
-                            borderRadius: '50%',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            fontWeight: 700,
-                            fontSize: 14,
-                          }}
-                        >
-                          {review.profiles?.name?.charAt(0).toUpperCase() ||
-                            'U'}
-                        </div>
-                        <div>
-                          <div style={{ fontWeight: 600, fontSize: 14 }}>
-                            {review.profiles?.name || 'Anonymous'}
-                          </div>
-                          <div style={{ color: '#FFD700', fontSize: 12 }}>
-                            {'★'.repeat(review.rating)}
-                            {'☆'.repeat(5 - review.rating)}
-                          </div>
-                        </div>
-                      </div>
-                      <div style={{ fontSize: 11, color: '#999' }}>
-                        {new Date(review.created_at).toLocaleDateString()}
-                      </div>
-                    </div>
-                    <p
-                      style={{
-                        margin: '0 0 12px 0',
-                        fontSize: 14,
-                        color: '#333',
-                        lineHeight: 1.5,
-                      }}
-                    >
-                      {review.comment}
-                    </p>
-
-                    {/* Admin Response */}
-                    {review.admin_response && (
-                      <div
-                        style={{
-                          background: '#F0F7FF',
-                          padding: 12,
-                          borderRadius: 8,
-                          borderLeft: '4px solid #007BFF',
-                          marginLeft: 40,
-                        }}
-                      >
-                        <div
-                          style={{
-                            fontSize: 12,
-                            fontWeight: 700,
-                            color: '#007BFF',
-                            marginBottom: 4,
-                          }}
-                        >
-                          ️ Vesta Admin Response
-                        </div>
-                        <p style={{ margin: 0, fontSize: 13, color: '#333' }}>
-                          {review.admin_response}
-                        </p>
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
             )}
           </div>
-        </div>
 
-        {/* Right Column: Pricing & Contact */}
-        <div>
-          <div
-            style={{
-              background: 'white',
-              padding: 24,
-              borderRadius: 16,
-              boxShadow: '0 4px 20px rgba(0,0,0,0.05)',
-              position: 'sticky',
-              top: 20,
-            }}
-          >
-            <div
-              style={{
-                fontSize: 28,
-                fontWeight: 800,
-                color: '#D4873A',
-                marginBottom: 8,
-              }}
-            >
-              KSh {listing.price?.toLocaleString()}
-              <span style={{ fontSize: 14, color: '#6B5B4E', fontWeight: 500 }}>
-                /month
-              </span>
+          {/* Right Column: Contact & Info */}
+          <div>
+            <div style={{ background: 'white', padding: 24, borderRadius: 12, boxShadow: '0 4px 20px rgba(0,0,0,0.06)', position: 'sticky', top: 90 }}>
+              <h3 style={{ margin: '0 0 20px 0', color: '#1C1209', fontSize: 18 }}>Interested in this property?</h3>
+              
+              {!showContact ? (
+                <button 
+                  onClick={handleContactClick}
+                  style={{ 
+                    width: '100%', 
+                    padding: '16px', 
+                    background: 'linear-gradient(135deg, #00C35D, #009E4B)', 
+                    color: 'white', 
+                    border: 'none', 
+                    borderRadius: 10, 
+                    cursor: 'pointer', 
+                    fontWeight: 700, 
+                    fontSize: 16,
+                    boxShadow: '0 4px 15px rgba(0, 195, 93, 0.3)',
+                    transition: 'transform 0.2s'
+                  }}
+                  onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.02)'}
+                  onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
+                >
+                  📞 Contact Landlord
+                </button>
+              ) : (
+                <div style={{ background: '#E8F5E9', padding: 20, borderRadius: 10, border: '1px solid #C8E6C9' }}>
+                  <div style={{ fontSize: 14, color: '#2E7D32', fontWeight: 600, marginBottom: 12 }}>
+                    ✅ Contact Details Revealed
+                  </div>
+                  <div style={{ marginBottom: 12 }}>
+                    <div style={{ fontSize: 12, color: '#666', marginBottom: 4 }}>Landlord Name</div>
+                    <div style={{ fontWeight: 700, color: '#1C1209', fontSize: 16 }}>{landlord?.name || 'Property Manager'}</div>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 12, color: '#666', marginBottom: 4 }}>Email Address</div>
+                    <a href={`mailto:${landlord?.email}`} style={{ fontWeight: 700, color: '#007BFF', fontSize: 16, textDecoration: 'none' }}>
+                      {landlord?.email}
+                    </a>
+                  </div>
+                  <button 
+                    onClick={() => window.location.href = `mailto:${landlord?.email}?subject=Inquiry about ${listing.name}`}
+                    style={{ 
+                      width: '100%', 
+                      marginTop: 16, 
+                      padding: '12px', 
+                      background: '#007BFF', 
+                      color: 'white', 
+                      border: 'none', 
+                      borderRadius: 8, 
+                      cursor: 'pointer', 
+                      fontWeight: 600 
+                    }}
+                  >
+                    ✉️ Send Email Now
+                  </button>
+                </div>
+              )}
+
+              <div style={{ marginTop: 24, paddingTop: 20, borderTop: '1px solid #eee' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+                  <span style={{ color: '#6B5B4E', fontSize: 14 }}>Nearest Institution</span>
+                  <span style={{ fontWeight: 600, color: '#1C1209', fontSize: 14 }}>{listing.institution}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span style={{ color: '#6B5B4E', fontSize: 14 }}>Property ID</span>
+                  <span style={{ fontWeight: 600, color: '#999', fontSize: 12 }}>#{listing.id.substring(0, 8)}</span>
+                </div>
+              </div>
             </div>
-            {listing.deposit && (
-              <div style={{ fontSize: 14, color: '#6B5B4E', marginBottom: 20 }}>
-                Deposit: KSh {listing.deposit?.toLocaleString()}
-              </div>
-            )}
-
-            <div
-              style={{
-                borderTop: '1px solid #eee',
-                paddingTop: 16,
-                marginBottom: 16,
-              }}
-            >
-              <div
-                style={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  marginBottom: 8,
-                }}
-              >
-                <span style={{ color: '#6B5B4E', fontSize: 13 }}>
-                  Property Type
-                </span>
-                <span style={{ fontWeight: 600, fontSize: 13 }}>
-                  {listing.type}
-                </span>
-              </div>
-              <div
-                style={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  marginBottom: 8,
-                }}
-              >
-                <span style={{ color: '#6B5B4E', fontSize: 13 }}>Gender</span>
-                <span style={{ fontWeight: 600, fontSize: 13 }}>
-                  {listing.gender}
-                </span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ color: '#6B5B4E', fontSize: 13 }}>Distance</span>
-                <span style={{ fontWeight: 600, fontSize: 13 }}>
-                  {listing.distance}
-                </span>
-              </div>
-            </div>
-
-            <button
-              onClick={toggleSave}
-              disabled={saving}
-              style={{
-                width: '100%',
-                padding: '12px',
-                marginBottom: 12,
-                background: isSaved ? '#FEE2E2' : 'white',
-                color: isSaved ? '#DC2626' : '#1C1209',
-                border: isSaved ? '2px solid #DC2626' : '2px solid #DDD0C4',
-                borderRadius: 10,
-                fontSize: 14,
-                fontWeight: 700,
-                cursor: 'pointer',
-              }}
-            >
-              {isSaved ? '❤️ Saved' : ' Save Property'}
-            </button>
-
-            <button
-              onClick={handleWhatsAppClick}
-              style={{
-                width: '100%',
-                padding: '14px',
-                background: 'linear-gradient(135deg, #25D366, #128C7E)',
-                color: 'white',
-                border: 'none',
-                borderRadius: 10,
-                fontSize: 15,
-                fontWeight: 700,
-                cursor: 'pointer',
-              }}
-            >
-              Contact via WhatsApp
-            </button>
           </div>
         </div>
       </div>
     </div>
-  );
+  )
 }
