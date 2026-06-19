@@ -356,7 +356,7 @@ export default function AdminPanel() {
                     </p>
                     {listing.assigned_agent && (
                       <p style={{ margin: '4px 0', fontSize: 12, color: '#2196F3' }}>
-                        👷 Agent: {listing.assigned_agent}
+                        👷 Agent: {agents.find(a => a.id === listing.assigned_agent)?.name || 'Unknown'}
                       </p>
                     )}
                     <div style={{ marginTop: 12, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
