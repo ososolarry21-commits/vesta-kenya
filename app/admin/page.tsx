@@ -40,42 +40,65 @@ export default function AdminPanel() {
     setLoading(false)
   }
 
-   async function fetchListings() {
-    // First, fetch all listings
-    const { data: listingsData } = await supabase
-      .from('listings')
-      .select(`
-        *,
-        profiles:landlord_id(name, email)
-      `)
-      .order('created_at', { ascending: false })
-    
-    if (!listingsData) {
-      setListings([])
-      return
-    }
-
-    // Then, fetch all completed assignments separately
-    const { data: assignmentsData } = await supabase
-      .from('verification_assignments')
-      .select('listing_id, proof_url, status, profiles:name')
-      .eq('status', 'completed')
-
-    // Map proof images to listings
-    const processed = listingsData.map(listing => {
-      const completedAssignment = assignmentsData?.find(
-        (a: any) => a.listing_id === listing.id
-      )
-      return {
-        ...listing,
-        proof_image_url: completedAssignment?.proof_url || null,
-        assigned_agent: completedAssignment?.profiles?.name || null
+    async function fetchListings() {
+    try {
+      // Fetch all listings
+      const { data: listingsData, error: listingsError } = await supabase
+        .from('listings')
+        .select(`
+          *,
+          profiles:landlord_id(name, email)
+        `)
+        .order('created_at', { ascending: false })
+      
+      if (listingsError) {
+        console.error('Error fetching listings:', listingsError)
+        alert('Error loading listings: ' + listingsError.message)
+        return
       }
-    })
-    
-    setListings(processed)
-  }
 
+      if (!listingsData || listingsData.length === 0) {
+        setListings([])
+        return
+      }
+
+      // Fetch ALL assignments (not just completed) to debug
+      const { data: assignmentsData, error: assignmentsError } = await supabase
+        .from('verification_assignments')
+        .select('listing_id, proof_url, status, agent_id')
+        .in('listing_id', listingsData.map(l => l.id))
+
+      if (assignmentsError) {
+        console.error('Error fetching assignments:', assignmentsError)
+      }
+
+      console.log('📊 Listings:', listingsData.length)
+      console.log('📋 Assignments:', assignmentsData)
+
+      // Map proof images to listings
+      const processed = listingsData.map(listing => {
+        const completedAssignment = assignmentsData?.find(
+          (a: any) => a.listing_id === listing.id && a.status === 'completed'
+        )
+        
+        console.log(`Listing "${listing.name}":`, {
+          hasProof: !!completedAssignment?.proof_url,
+          proofUrl: completedAssignment?.proof_url,
+          status: completedAssignment?.status
+        })
+
+        return {
+          ...listing,
+          proof_image_url: completedAssignment?.proof_url || null,
+          assigned_agent: completedAssignment?.agent_id || null
+        }
+      })
+      
+      setListings(processed)
+    } catch (error) {
+      console.error('Fatal error in fetchListings:', error)
+    }
+  }
   async function fetchAgents() {
     const { data } = await supabase
       .from('profiles')
