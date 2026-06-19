@@ -40,35 +40,40 @@ export default function AdminPanel() {
     setLoading(false)
   }
 
-  async function fetchListings() {
-    const { data } = await supabase
+   async function fetchListings() {
+    // First, fetch all listings
+    const { data: listingsData } = await supabase
       .from('listings')
       .select(`
         *,
-        profiles:landlord_id(name, email),
-        verification_assignments (
-          agent_id,
-          status,
-          proof_url,
-          profiles:name
-        )
+        profiles:landlord_id(name, email)
       `)
       .order('created_at', { ascending: false })
     
-    if (data) {
-      // Process to get the latest proof for each listing
-      const processed = data.map(listing => {
-        const completedAssignment = listing.verification_assignments?.find(
-          (a: any) => a.status === 'completed'
-        )
-        return {
-          ...listing,
-          proof_image_url: completedAssignment?.proof_url || null,
-          assigned_agent: completedAssignment?.profiles?.name || null
-        }
-      })
-      setListings(processed)
+    if (!listingsData) {
+      setListings([])
+      return
     }
+
+    // Then, fetch all completed assignments separately
+    const { data: assignmentsData } = await supabase
+      .from('verification_assignments')
+      .select('listing_id, proof_url, status, profiles:name')
+      .eq('status', 'completed')
+
+    // Map proof images to listings
+    const processed = listingsData.map(listing => {
+      const completedAssignment = assignmentsData?.find(
+        (a: any) => a.listing_id === listing.id
+      )
+      return {
+        ...listing,
+        proof_image_url: completedAssignment?.proof_url || null,
+        assigned_agent: completedAssignment?.profiles?.name || null
+      }
+    })
+    
+    setListings(processed)
   }
 
   async function fetchAgents() {
