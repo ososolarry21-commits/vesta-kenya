@@ -104,19 +104,19 @@ export default function Dashboard() {
   }
 
   const uploadImages = async (listingId: string): Promise<string[]> => {
-    const imageUrls: string[] = []
-    for (let i = 0; i < images.length; i++) {
-      const file = images[i]
-      const fileExt = file.name.split('.').pop()
-      const fileName = `${listingId}-${Date.now()}-${i}.${fileExt}`
-      const { error: uploadError } = await supabase.storage.from('property-images').upload(fileName, file)
-      if (uploadError) throw uploadError
-      const { data } = supabase.storage.from('property-images').getPublicUrl(fileName)
-      imageUrls.push(data.publicUrl)
-    }
-    return imageUrls
-  }
-
+  // Upload all images in parallel (much faster!)
+  const uploadPromises = images.map(async (file, index) => {
+    const fileExt = file.name.split('.').pop()
+    const fileName = `${listingId}-${Date.now()}-${index}.${fileExt}`
+    const { error: uploadError } = await supabase.storage.from('property-images').upload(fileName, file)
+    if (uploadError) throw uploadError
+    const { data } = supabase.storage.from('property-images').getPublicUrl(fileName)
+    return data.publicUrl
+  })
+  
+  const imageUrls = await Promise.all(uploadPromises)
+  return imageUrls
+}
   async function handleAddListing(e: React.FormEvent) {
     e.preventDefault()
     if (!user) return
