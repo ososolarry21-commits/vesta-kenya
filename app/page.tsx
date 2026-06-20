@@ -15,6 +15,7 @@ export default function Home() {
   const [msg, setMsg] = useState('')
   const [loading, setLoading] = useState(false)
 
+    // FEATURE 2: Prevent Duplicate Signups
   async function signUp() {
     setLoading(true)
     setMsg('')
@@ -26,7 +27,12 @@ export default function Home() {
     })
     
     if (error) {
-      setMsg(error.message)
+      // Check for duplicate email error
+      if (error.message.includes('already registered') || error.message.includes('User already registered')) {
+        setMsg('⚠️ An account with this email already exists. Please log in instead.')
+      } else {
+        setMsg(error.message)
+      }
       setLoading(false)
       return
     }
@@ -55,59 +61,89 @@ export default function Home() {
     setLoading(false)
   }
 
+  // FEATURE 1: 3-Strike Lockout
   async function logIn() {
     setLoading(true)
     setMsg('')
     
+    // Check if user is locked out
+    const failedAttempts = parseInt(localStorage.getItem(`failed_attempts_${email}`) || '0')
+    
+    if (failedAttempts >= 3) {
+      const lockoutTime = parseInt(localStorage.getItem(`lockout_time_${email}`) || '0')
+      const now = Date.now()
+      // 15 minute lockout
+      if (now - lockoutTime < 15 * 60 * 1000) { 
+        const minutesLeft = Math.ceil((15 * 60 * 1000 - (now - lockoutTime)) / 60000)
+        setMsg(`🔒 Too many failed attempts. Please try again in ${minutesLeft} minutes.`)
+        setLoading(false)
+        return
+      } else {
+        // Reset counter after 15 minutes
+        localStorage.removeItem(`failed_attempts_${email}`)
+        localStorage.removeItem(`lockout_time_${email}`)
+      }
+    }
+
     const { data, error } = await supabase.auth.signInWithPassword({ email, password })
     
     if (error) {
-      setMsg(error.message)
+      // Increment failed attempts
+      const newAttempts = failedAttempts + 1
+      localStorage.setItem(`failed_attempts_${email}`, newAttempts.toString())
+      
+      if (newAttempts >= 3) {
+        localStorage.setItem(`lockout_time_${email}`, Date.now().toString())
+        setMsg('🔒 Account temporarily locked due to too many failed attempts. Try again in 15 minutes.')
+      } else {
+        setMsg(`⚠️ Invalid credentials. ${3 - newAttempts} attempts remaining.`)
+      }
       setLoading(false)
       return
     }
 
     if (data.user) {
+      // Reset failed attempts on successful login
+      localStorage.removeItem(`failed_attempts_${email}`)
+      localStorage.removeItem(`lockout_time_${email}`)
+
       const { data: profile } = await supabase
         .from('profiles')
-        .select('role')
+        .select('role, is_locked')
         .eq('id', data.user.id)
         .single()
 
+      if (profile?.is_locked) {
+        setMsg('🔒 Your account has been locked by an administrator. Please contact support.')
+        await supabase.auth.signOut()
+        setLoading(false)
+        return
+      }
+
       const dbRole = profile?.role || 'student'
 
-      // 1. Handle Admin Accounts
-      if (dbRole === 'admin') {
-        if (role !== 'landlord') {
-          setMsg('⚠️ This is an Admin account. Please select the "Landlord" button to log in.')
-          setLoading(false)
-          return
-        }
-        window.location.href = '/admin'
+      if (dbRole === 'admin' && role !== 'landlord') {
+        setMsg('⚠️ This is an Admin account. Please select the "Landlord" button to log in.')
+        setLoading(false)
         return
       }
-
-      // 2. Handle Agent Accounts
-      if (dbRole === 'agent') {
-        if (role !== 'landlord') {
-          setMsg('⚠️ This is an Agent account. Please select the "Landlord" button to log in.')
-          setLoading(false)
-          return
-        }
-        window.location.href = '/agent'
+      if (dbRole === 'agent' && role !== 'landlord') {
+        setMsg('⚠️ This is an Agent account. Please select the "Landlord" button to log in.')
+        setLoading(false)
         return
       }
-
-      // 3. Strict check for normal users
-      if (dbRole !== role) {
+      if (dbRole !== role && dbRole !== 'admin' && dbRole !== 'agent') {
         setMsg(`⚠️ This account is registered as a ${dbRole}. Please select the ${dbRole} button to log in.`)
         setLoading(false)
         return
       }
 
-      // 4. Redirect normal users
       if (dbRole === 'student') {
         window.location.href = '/browse'
+      } else if (dbRole === 'admin') {
+        window.location.href = '/admin'
+      } else if (dbRole === 'agent') {
+        window.location.href = '/agent'
       } else {
         window.location.href = '/dashboard'
       }
