@@ -457,7 +457,7 @@ export default function EditListing() {
                 value={form.name}
                 onChange={(e) => setForm({ ...form, name: e.target.value })}
                 placeholder="e.g. JKUAT Gate B Bedsitters"
-                style={inputStyle}
+                style={inputStyle as React.CSSProperties}
               />
             </div>
             <div>
