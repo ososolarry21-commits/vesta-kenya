@@ -664,14 +664,14 @@ export default function EditListing() {
   );
 }
 
-const labelStyle = {
+const labelStyle: any = {
   display: 'block',
   marginBottom: 8,
   fontWeight: 600,
   color: '#1C1209',
   fontSize: 14,
 };
-const inputStyle = {
+const inputStyle: any = {
   width: '100%',
   padding: '14px 16px',
   border: '1px solid #DDD0C4',
