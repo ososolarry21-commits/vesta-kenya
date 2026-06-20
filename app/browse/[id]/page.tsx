@@ -289,7 +289,7 @@ export default function ListingDetails() {
             <div style={{ background: 'white', padding: 24, borderRadius: 12, boxShadow: '0 4px 20px rgba(0,0,0,0.06)', position: 'sticky', top: 90 }}>
               <h3 style={{ margin: '0 0 20px 0', color: '#1C1209', fontSize: 18 }}>Interested in this property?</h3>
               
-              {!showContact ? (
+                            {!showContact ? (
                 <button 
                   onClick={handleContactClick}
                   style={{ 
@@ -312,38 +312,96 @@ export default function ListingDetails() {
                 </button>
               ) : (
                 <div style={{ background: '#E8F5E9', padding: 20, borderRadius: 10, border: '1px solid #C8E6C9' }}>
-                  <div style={{ fontSize: 14, color: '#2E7D32', fontWeight: 600, marginBottom: 12 }}>
+                  <div style={{ fontSize: 14, color: '#2E7D32', fontWeight: 600, marginBottom: 16 }}>
                     ✅ Contact Details Revealed
                   </div>
-                  <div style={{ marginBottom: 12 }}>
+                  
+                  {/* Landlord Name */}
+                  <div style={{ marginBottom: 16 }}>
                     <div style={{ fontSize: 12, color: '#666', marginBottom: 4 }}>Landlord Name</div>
                     <div style={{ fontWeight: 700, color: '#1C1209', fontSize: 16 }}>{landlord?.name || 'Property Manager'}</div>
                   </div>
-                  <div>
-                    <div style={{ fontSize: 12, color: '#666', marginBottom: 4 }}>Email Address</div>
-                    <a href={`mailto:${landlord?.email}`} style={{ fontWeight: 700, color: '#007BFF', fontSize: 16, textDecoration: 'none' }}>
-                      {landlord?.email}
-                    </a>
+                  
+                  {/* Phone Number */}
+                  <div style={{ marginBottom: 20 }}>
+                    <div style={{ fontSize: 12, color: '#666', marginBottom: 4 }}>Phone Number</div>
+                    <div style={{ fontWeight: 700, color: '#1C1209', fontSize: 16 }}>
+                      {landlord?.phone || 'Not provided'}
+                    </div>
                   </div>
-                  <button 
-                    onClick={() => window.location.href = `mailto:${landlord?.email}?subject=Inquiry about ${listing.name}`}
-                    style={{ 
-                      width: '100%', 
-                      marginTop: 16, 
-                      padding: '12px', 
-                      background: '#007BFF', 
-                      color: 'white', 
-                      border: 'none', 
-                      borderRadius: 8, 
-                      cursor: 'pointer', 
-                      fontWeight: 600 
-                    }}
-                  >
-                    ✉️ Send Email Now
-                  </button>
+                  
+                  {/* WhatsApp Button */}
+                  {landlord?.phone && (
+                    <button 
+                      onClick={() => {
+                        const phone = landlord.phone.replace(/\D/g, '')
+                        const message = `Hi, I'm interested in ${listing.name} - KSh ${listing.price?.toLocaleString()}/month. Is it still available?`
+                        const whatsappUrl = `https://wa.me/${phone}?text=${encodeURIComponent(message)}`
+                        window.open(whatsappUrl, '_blank')
+                      }}
+                      style={{ 
+                        width: '100%', 
+                        padding: '14px', 
+                        background: '#25D366', 
+                        color: 'white', 
+                        border: 'none', 
+                        borderRadius: 8, 
+                        cursor: 'pointer', 
+                        fontWeight: 700,
+                        fontSize: 15,
+                        marginBottom: 10,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: 8
+                      }}
+                    >
+                      💬 Chat on WhatsApp
+                    </button>
+                  )}
+                  
+                  {/* Call Button */}
+                  {landlord?.phone && (
+                    <button 
+                      onClick={() => window.location.href = `tel:${landlord.phone}`}
+                      style={{ 
+                        width: '100%', 
+                        padding: '14px', 
+                        background: '#007BFF', 
+                        color: 'white', 
+                        border: 'none', 
+                        borderRadius: 8, 
+                        cursor: 'pointer', 
+                        fontWeight: 700,
+                        fontSize: 15,
+                        marginBottom: 10
+                      }}
+                    >
+                      📞 Call Now
+                    </button>
+                  )}
+                  
+                  {/* Email as fallback */}
+                  {landlord?.email && (
+                    <button 
+                      onClick={() => window.location.href = `mailto:${landlord.email}?subject=Inquiry about ${listing.name}`}
+                      style={{ 
+                        width: '100%', 
+                        padding: '12px', 
+                        background: 'white', 
+                        color: '#007BFF', 
+                        border: '2px solid #007BFF', 
+                        borderRadius: 8, 
+                        cursor: 'pointer', 
+                        fontWeight: 600,
+                        fontSize: 14
+                      }}
+                    >
+                      ✉️ Send Email
+                    </button>
+                  )}
                 </div>
               )}
-
               <div style={{ marginTop: 24, paddingTop: 20, borderTop: '1px solid #eee' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
                   <span style={{ color: '#6B5B4E', fontSize: 14 }}>Nearest Institution</span>
