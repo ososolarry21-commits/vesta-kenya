@@ -25,13 +25,13 @@ export default function ListingDetails() {
     try {
       // Fetch listing and landlord profile in one go
       const { data, error } = await supabase
-        .from('listings')
-        .select(`
-          *,
-          profiles:landlord_id (name, email)
-        `)
-        .eq('id', id)
-        .single()
+  .from('listings')
+  .select(`
+    *,
+    profiles:landlord_id (name, email, phone)
+  `)
+  .eq('id', id)
+  .single()
 
       if (error) throw error
       
