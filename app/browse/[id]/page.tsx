@@ -16,22 +16,47 @@ export default function ListingDetails() {
   const [loading, setLoading] = useState(true)
   const [currentImage, setCurrentImage] = useState(0)
   const [showContact, setShowContact] = useState(false)
+  
+  // New State for Save Feature
+  const [user, setUser] = useState<any>(null)
+  const [isSaved, setIsSaved] = useState(false)
+  const [saving, setSaving] = useState(false)
 
   useEffect(() => {
-    if (id) fetchListing()
+    const init = async () => {
+      // 1. Get current user
+      const { data: { user: currentUser } } = await supabase.auth.getUser()
+      setUser(currentUser)
+      
+      // 2. Check if property is already saved
+      if (currentUser && id) {
+        const { data } = await supabase
+          .from('saved_properties')
+          .select('*')
+          .eq('user_id', currentUser.id)
+          .eq('listing_id', id)
+          .maybeSingle()
+        
+        if (data) setIsSaved(true)
+      }
+      
+      // 3. Fetch listing details
+      if (id) fetchListing()
+    }
+    
+    init()
   }, [id])
 
   async function fetchListing() {
     try {
-      // Fetch listing and landlord profile in one go
       const { data, error } = await supabase
-  .from('listings')
-  .select(`
-    *,
-    profiles:landlord_id (name, email, phone)
-  `)
-  .eq('id', id)
-  .single()
+        .from('listings')
+        .select(`
+          *,
+          profiles:landlord_id (name, email, phone)
+        `)
+        .eq('id', id)
+        .single()
 
       if (error) throw error
       
@@ -52,7 +77,6 @@ export default function ListingDetails() {
         .update({ contacts: (listing.contacts || 0) + 1 })
         .eq('id', listing.id)
       
-      // Update local state so UI reflects it immediately if needed
       setListing({ ...listing, contacts: (listing.contacts || 0) + 1 })
     } catch (error) {
       console.error('Error tracking contact:', error)
@@ -62,6 +86,38 @@ export default function ListingDetails() {
   const handleContactClick = () => {
     trackContact()
     setShowContact(true)
+  }
+
+  // --- SAVE PROPERTY FUNCTION ---
+  const handleSaveProperty = async () => {
+    if (!user) {
+      alert("Please log in to save properties to your favorites.")
+      router.push('/')
+      return
+    }
+
+    setSaving(true)
+    try {
+      if (isSaved) {
+        // Remove from saved
+        await supabase
+          .from('saved_properties')
+          .delete()
+          .eq('user_id', user.id)
+          .eq('listing_id', listing.id)
+        setIsSaved(false)
+      } else {
+        // Add to saved
+        await supabase
+          .from('saved_properties')
+          .insert({ user_id: user.id, listing_id: listing.id })
+        setIsSaved(true)
+      }
+    } catch (error) {
+      console.error("Error saving property:", error)
+      alert("Could not update favorites. Please try again.")
+    }
+    setSaving(false)
   }
 
   if (loading) {
@@ -79,7 +135,7 @@ export default function ListingDetails() {
     return (
       <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#FDF8F3' }}>
         <div style={{ textAlign: 'center' }}>
-          <div style={{ fontSize: 40, marginBottom: 16 }}></div>
+          <div style={{ fontSize: 40, marginBottom: 16 }}>❌</div>
           <h2 style={{ color: '#1C1209' }}>Property Not Found</h2>
           <button onClick={() => router.push('/browse')} style={{ marginTop: 20, padding: '10px 20px', background: '#D4873A', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer' }}>
             Back to Browse
@@ -108,18 +164,16 @@ export default function ListingDetails() {
         <div style={{ 
           height: 400, 
           background: (() => {
-            // Handle images safely - check if it's an array or string
             const images = listing.images || [];
             const currentImg = Array.isArray(images) ? images[currentImage] : images;
             return currentImg ? `url("${currentImg}") center/cover` : 'linear-gradient(135deg, #D4873A, #E8B86D)';
           })(),
           transition: 'background 0.3s ease'
         }}>
-          {/* Fallback if no image */}
           {!listing.images || listing.images.length === 0}
         </div>
         
-        {/* Navigation Arrows - Only show if more than 1 image */}
+        {/* Navigation Arrows */}
         {(() => {
           const images = listing.images || [];
           const imageCount = Array.isArray(images) ? images.length : (images ? 1 : 0);
@@ -289,7 +343,32 @@ export default function ListingDetails() {
             <div style={{ background: 'white', padding: 24, borderRadius: 12, boxShadow: '0 4px 20px rgba(0,0,0,0.06)', position: 'sticky', top: 90 }}>
               <h3 style={{ margin: '0 0 20px 0', color: '#1C1209', fontSize: 18 }}>Interested in this property?</h3>
               
-                            {!showContact ? (
+              {/* SAVE PROPERTY BUTTON */}
+              <button 
+                onClick={handleSaveProperty}
+                disabled={saving}
+                style={{ 
+                  width: '100%', 
+                  padding: '14px', 
+                  background: isSaved ? '#E8F5E9' : 'white', 
+                  color: isSaved ? '#2E7D32' : '#1C1209', 
+                  border: '2px solid #DDD0C4', 
+                  borderRadius: 10, 
+                  cursor: saving ? 'not-allowed' : 'pointer', 
+                  fontWeight: 700, 
+                  fontSize: 15,
+                  marginBottom: 15,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 8,
+                  transition: 'all 0.2s'
+                }}
+              >
+                {saving ? 'Processing...' : (isSaved ? '❤️ Saved to Favorites' : '🤍 Save to Favorites')}
+              </button>
+
+              {!showContact ? (
                 <button 
                   onClick={handleContactClick}
                   style={{ 
