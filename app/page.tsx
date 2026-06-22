@@ -107,20 +107,30 @@ export default function Home() {
       localStorage.removeItem(`failed_attempts_${email}`)
       localStorage.removeItem(`lockout_time_${email}`)
 
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('role, is_locked')
-        .eq('id', data.user.id)
-        .single()
+     const { data: profile, error: profileError } = await supabase
+  .from('profiles')
+  .select('role, is_locked')
+  .eq('id', data.user.id)
+  .single()
 
-      if (profile?.is_locked) {
-        setMsg('🔒 Your account has been locked by an administrator. Please contact support.')
-        await supabase.auth.signOut()
-        setLoading(false)
-        return
-      }
+// DEBUG: Log what we're getting
+console.log('Profile query result:', profile)
+console.log('Profile error:', profileError)
+console.log('User ID:', data.user.id)
 
-      const dbRole = profile?.role || 'student'
+if (profileError) {
+  console.error('Error fetching profile:', profileError)
+}
+
+if (profile?.is_locked) {
+  setMsg('🔒 Your account has been locked by an administrator. Please contact support.')
+  await supabase.auth.signOut()
+  setLoading(false)
+  return
+}
+
+const dbRole = profile?.role || 'student'
+console.log('Detected role:', dbRole)
 
       if (dbRole === 'admin' && role !== 'landlord') {
         setMsg('⚠️ This is an Admin account. Please select the "Landlord" button to log in.')
